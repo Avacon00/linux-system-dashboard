@@ -23,7 +23,7 @@ Ein einziger Befehl installiert alles automatisch:
 
 ```bash
 curl -fsSL https://schuttehub.de/install | bash
-```
+``` noch NICHT FERTIG! Upodate 1.2 SOON!
 
 ### 📱 **AppImage** (Direkt-Download)
 
@@ -233,3 +233,4 @@ Bei Problemen oder Fragen:
 ---
 
 **Entwickelt mit ❤️ für die Linux-Community**
+
