@@ -1,0 +1,165 @@
+name: Build and Release Linux System Dashboard
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxss1 libasound2-dev
+
+    - name: Install Node Dependencies
+      run: npm ci
+
+    - name: Run Tests (if available)
+      run: npm test --if-present
+      continue-on-error: true
+
+    - name: Build Application
+      run: npm run build --if-present
+
+    - name: Build Linux Packages
+      if: matrix.node-version == '20.x'
+      run: |
+        npm run dist-linux
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Build Artifacts
+      if: matrix.node-version == '20.x'
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-packages
+        path: |
+          dist/*.AppImage
+          dist/*.deb
+          dist/latest-linux.yml
+        retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Download Build Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: linux-packages
+        path: dist/
+
+    - name: Extract Version from Tag
+      id: version
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        VERSION=${TAG#v}
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Generate Release Notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        # 🚀 Linux System Dashboard ${{ steps.version.outputs.version }}
+
+        ## ✨ Was ist neu:
+        - Performance-optimiertes System-Monitoring
+        - Ein-Klick AppImage Installation
+        - Erweiterte Sicherheits-Features
+        - Verbessertes Memory-Management
+
+        ## 📦 Installation:
+
+        ### 🎯 Einfachste Installation (empfohlen):
+        ```bash
+        curl -fsSL https://schuttehub.de/install | bash
+        ```
+
+        ### 📱 AppImage (Direkt-Download):
+        1. `Linux-System-Dashboard-x64.AppImage` herunterladen
+        2. Ausführbar machen: `chmod +x Linux-System-Dashboard-x64.AppImage`  
+        3. Starten: `./Linux-System-Dashboard-x64.AppImage`
+
+        ### 🐧 Debian/Ubuntu (.deb):
+        ```bash
+        sudo dpkg -i linux-system-dashboard_${{ steps.version.outputs.version }}_amd64.deb
+        ```
+
+        ## 🔧 Features:
+        - ⚡ Echtzeit System-Metriken (CPU, RAM, Disk, Network)
+        - 📊 Interaktive Performance-Charts
+        - 📦 Paket-Management (pacman, AUR)  
+        - 🛡️ Sicherheits-Center mit Scans
+        - 💻 Integriertes Terminal
+        - 🎓 Lernbereich für Linux-Einsteiger
+
+        ## 🔄 Updates:
+        Die App prüft automatisch auf Updates und benachrichtigt Sie.
+
+        ## 🐛 Bug Reports:
+        Issues bitte auf GitHub melden: https://github.com/Avacon00/linux-system-dashboard/issues
+
+        ---
+        💙 Entwickelt von **Avacon00** | 🌐 [schuttehub.de](https://schuttehub.de)
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.tag }}
+        name: "Linux System Dashboard ${{ steps.version.outputs.version }}"
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: |
+          dist/*.AppImage
+          dist/*.deb
+          dist/latest-linux.yml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-installer:
+    name: Update Web Installer
+    needs: release
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Update Installer Script
+      run: |
+        # Copy installer to a web-accessible location (if you have one)
+        echo "Installer updated for version ${{ github.ref_name }}"
+        # You could deploy this to schuttehub.de here

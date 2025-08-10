@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux System Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Title Bar -->
+    <div class="title-bar">
+        <div class="title-bar-left">
+            <img src="assets/icon.png" alt="Logo" class="logo">
+            <span class="title">Linux System Dashboard</span>
+        </div>
+        <div class="title-bar-right">
+            <button class="title-bar-btn" id="minimize-btn">─</button>
+            <button class="title-bar-btn" id="maximize-btn">□</button>
+            <button class="title-bar-btn close" id="close-btn">×</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-item active" data-tab="system">
+                <i class="icon">📊</i>
+                <span>System-Info</span>
+            </div>
+            <div class="sidebar-item" data-tab="actions">
+                <i class="icon">⚡</i>
+                <span>Schnellaktionen</span>
+            </div>
+            <div class="sidebar-item" data-tab="learn">
+                <i class="icon">📚</i>
+                <span>Lernbereich</span>
+            </div>
+            <div class="sidebar-item" data-tab="terminal">
+                <i class="icon">💻</i>
+                <span>Terminal</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- System Info Tab -->
+            <div class="tab-content active" id="system-tab">
+                <div class="tab-header">
+                    <h2>📊 System-Übersicht</h2>
+                    <div class="header-controls">
+                        <select id="update-speed" class="speed-selector">
+                            <option value="1000">1s (Hoch)</option>
+                            <option value="2000">2s (Normal)</option>
+                            <option value="3000" selected>3s (Empfohlen)</option>
+                            <option value="5000">5s (Sparsam)</option>
+                            <option value="10000">10s (Minimal)</option>
+                        </select>
+                        <div class="refresh-btn" id="refresh-system">🔄 Aktualisieren</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Stats Overview -->
+                <div class="quick-stats">
+                    <div class="stat-item">
+                        <div class="stat-icon">🖥️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="cpu-usage-quick">0%</div>
+                            <div class="stat-label">CPU</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">🧠</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="ram-usage-quick">0%</div>
+                            <div class="stat-label">RAM</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="disk-usage-quick">0%</div>
+                            <div class="stat-label">Speicher</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="uptime-quick">0</div>
+                            <div class="stat-label">Laufzeit</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enhanced System Overview Grid -->
+                <div class="system-overview">
+                    <div class="overview-column">
+                        <!-- CPU Card Enhanced -->
+                        <div class="card cpu-card">
+                            <h3>🖥️ Prozessor</h3>
+                            <div class="cpu-info-grid">
+                                <div class="cpu-main-info">
+                                    <div class="metric">
+                                        <div class="metric-value" id="cpu-usage">0%</div>
+                                        <div class="metric-label">Aktuelle Auslastung</div>
+                                    </div>
+                                    <div class="cpu-chart-container">
+                                        <canvas id="cpu-chart" width="150" height="80"></canvas>
+                                    </div>
+                                </div>
+                                <div class="metric-details">
+                                    <div class="info-row">
+                                        <span class="info-label">Modell</span>
+                                        <span id="cpu-model">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Kerne</span>
+                                        <span id="cpu-cores">-</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Taktfrequenz</span>
+                                        <span id="cpu-speed">-</span>
+                                    </div>
+                                </div>
+                                <div class="cpu-cores-container">
+                                    <h4>CPU-Kerne im Detail:</h4>
+                                    <div class="cpu-cores-grid" id="cpu-cores-grid">
+                                        <!-- Individual CPU cores will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Info Enhanced -->
+                        <div class="card system-card">
+                            <h3>ℹ️ System-Information</h3>
+                            <div class="system-info">
+                                <div class="info-row">
+                                    <span class="info-label">Betriebssystem</span>
+                                    <span id="os-distro">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Version</span>
+                                    <span id="os-release">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Hostname</span>
+                                    <span id="os-hostname">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Laufzeit</span>
+                                    <span id="system-uptime">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Kernel</span>
+                                    <span id="system-kernel">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Architektur</span>
+                                    <span id="system-arch">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overview-column">
+                        <!-- Memory Card Enhanced -->
+                        <div class="card memory-card">
+                            <h3>🧠 Arbeitsspeicher</h3>
+                            <div class="memory-info-grid">
+                                <div class="memory-stats">
+                                    <div class="metric">
+                                        <div class="metric-value" id="ram-usage">0%</div>
+                                        <div class="metric-label">Speicher-Auslastung</div>
+                                    </div>
+                                    <div class="memory-bar">
+                                        <div class="memory-bar-fill" id="memory-bar-fill" style="width: 0%"></div>
+                                    </div>
+                                    <div class="metric-details">
+                                        <div class="info-row">
+                                            <span class="info-label">Gesamt</span>
+                                            <span id="ram-total">-</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Verwendet</span>
+                                            <span id="ram-used">-</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Verfügbar</span>
+                                            <span id="ram-free">-</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Puffer/Cache</span>
+                                            <span id="ram-cached">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="memory-chart-container">
+                                    <canvas id="ram-chart" width="150" height="80"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Storage Card Enhanced -->
+                        <div class="card storage-card">
+                            <h3>💾 Speicher-Geräte</h3>
+                            <div id="disk-list">
+                                <!-- Disk entries will be populated here -->
+                            </div>
+                        </div>
+
+                        <!-- Temperature & Sensors Card -->
+                        <div class="card temperature-card">
+                            <h4>🌡️ Temperatur & Sensoren</h4>
+                            <div class="temperature-grid" id="temperature-grid">
+                                <div class="temp-item">
+                                    <div class="temp-icon">🖥️</div>
+                                    <div class="temp-info">
+                                        <div class="temp-label">CPU</div>
+                                        <div class="temp-value" id="cpu-temp">-°C</div>
+                                    </div>
+                                </div>
+                                <div class="temp-item">
+                                    <div class="temp-icon">💾</div>
+                                    <div class="temp-info">
+                                        <div class="temp-label">Speicher</div>
+                                        <div class="temp-value" id="storage-temp">-°C</div>
+                                    </div>
+                                </div>
+                                <div class="temp-item">
+                                    <div class="temp-icon">🌐</div>
+                                    <div class="temp-info">
+                                        <div class="temp-label">System</div>
+                                        <div class="temp-value" id="system-temp">-°C</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processes -->
+                <div class="card full-width">
+                    <h3>🔄 Laufende Prozesse</h3>
+                    <div class="process-list" id="process-list">
+                        <!-- Process entries will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Network -->
+                <div class="card full-width">
+                    <h3>🌐 Netzwerk</h3>
+                    <div class="network-info" id="network-info">
+                        <!-- Network info will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Tab -->
+            <div class="tab-content" id="actions-tab">
+                <div class="tab-header">
+                    <h2>⚡ Schnellaktionen</h2>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <!-- System Updates -->
+                    <div class="card">
+                        <h3>🔄 System-Updates</h3>
+                        <div class="update-status">
+                            <div class="update-count" id="update-count">0 Updates verfügbar</div>
+                            <button class="btn primary" id="check-updates">Updates prüfen</button>
+                            <button class="btn secondary" id="install-updates">Updates installieren</button>
+                        </div>
+                        <div class="update-list" id="update-list">
+                            <!-- Update list will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Software Installation -->
+                    <div class="card">
+                        <h3>📦 Software installieren</h3>
+                        <div class="package-search">
+                            <div class="search-input-container">
+                                <input type="text" id="package-search" placeholder="Software suchen (z.B. Chrome, Brave, Firefox)...">
+                                <button class="btn secondary" id="search-packages">Suchen</button>
+                            </div>
+                            <div class="package-suggestions" id="package-suggestions" style="display: none;">
+                                <!-- Suggestions will be populated here -->
+                            </div>
+                        </div>
+                        <div class="install-status" id="install-status"></div>
+                    </div>
+
+                    <!-- Services -->
+                    <div class="card">
+                        <h3>🔧 Dienste</h3>
+                        <div class="services-list" id="services-list">
+                            <!-- Services will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Firewall -->
+                    <div class="card">
+                        <h3>🛡️ Firewall</h3>
+                        <div class="firewall-status">
+                            <div class="status-indicator" id="firewall-status">Unbekannt</div>
+                            <button class="btn secondary" id="toggle-firewall">Firewall umschalten</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Tools -->
+                <div class="card full-width">
+                    <h3>🛠️ Schnellzugriff</h3>
+                    <div class="quick-tools">
+                        <button class="tool-btn" data-command="gnome-terminal">Terminal öffnen</button>
+                        <button class="tool-btn" data-command="nautilus">Dateimanager öffnen</button>
+                        <button class="tool-btn" data-command="gnome-system-monitor">System-Monitor öffnen</button>
+                        <button class="tool-btn" data-command="gnome-software">Software-Center öffnen</button>
+                    </div>
+                </div>
+
+                <!-- Security Features Section -->
+                <div class="card full-width">
+                    <h3>🔒 Sicherheits-Center</h3>
+                    <div class="dashboard-grid">
+                        <!-- Security Overview -->
+                        <div class="card security-overview">
+                            <h4>📊 Sicherheits-Status</h4>
+                            <div class="security-metrics">
+                                <div class="security-metric">
+                                    <div class="metric-icon">🔐</div>
+                                    <div class="metric-info">
+                                        <div class="metric-title">SSH-Status</div>
+                                        <div class="metric-value" id="ssh-status">Prüfe...</div>
+                                    </div>
+                                </div>
+                                <div class="security-metric">
+                                    <div class="metric-icon">🚫</div>
+                                    <div class="metric-info">
+                                        <div class="metric-title">Fail2Ban</div>
+                                        <div class="metric-value" id="fail2ban-status">Prüfe...</div>
+                                    </div>
+                                </div>
+                                <div class="security-metric">
+                                    <div class="metric-icon">🔍</div>
+                                    <div class="metric-info">
+                                        <div class="metric-title">Offene Ports</div>
+                                        <div class="metric-value" id="open-ports">Scanne...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn primary" id="security-scan">Sicherheitsscan starten</button>
+                        </div>
+
+                        <!-- Security Actions -->
+                        <div class="card security-actions">
+                            <h4>⚡ Sicherheits-Aktionen</h4>
+                            <div class="security-buttons">
+                                <button class="btn secondary" id="check-updates-security">🔄 Sicherheitsupdates prüfen</button>
+                                <button class="btn secondary" id="audit-packages">📦 Paket-Audit</button>
+                                <button class="btn secondary" id="check-rootkits">🕵️ Rootkit-Scan</button>
+                                <button class="btn secondary" id="network-scan">🌐 Netzwerk scannen</button>
+                            </div>
+                        </div>
+
+                        <!-- Recent Security Events -->
+                        <div class="card security-logs">
+                            <h4>📋 Sicherheits-Ereignisse</h4>
+                            <div class="security-events" id="security-events">
+                                <div class="loading-message">Lade Sicherheitsereignisse...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learning Tab -->
+            <div class="tab-content" id="learn-tab">
+                <div class="tab-header">
+                    <h2>📚 Lernbereich</h2>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <!-- Command of the Day -->
+                    <div class="card">
+                        <h3>💡 Befehl des Tages</h3>
+                        <div class="command-of-day">
+                            <div class="command" id="todays-command">ls -la</div>
+                            <div class="command-explanation" id="command-explanation">
+                                Listet alle Dateien und Verzeichnisse mit Details auf
+                            </div>
+                            <button class="btn secondary" id="try-command">Befehl ausprobieren</button>
+                        </div>
+                    </div>
+
+                    <!-- Common Problems -->
+                    <div class="card">
+                        <h3>🔧 Häufige Probleme</h3>
+                        <div class="problems-list">
+                            <div class="problem-item">
+                                <h4>System wird langsam</h4>
+                                <p>Überprüfen Sie die CPU- und RAM-Auslastung</p>
+                                <button class="btn small">Lösung anzeigen</button>
+                            </div>
+                            <div class="problem-item">
+                                <h4>Netzwerk funktioniert nicht</h4>
+                                <p>Überprüfen Sie die Netzwerkverbindung</p>
+                                <button class="btn small">Lösung anzeigen</button>
+                            </div>
+                            <div class="problem-item">
+                                <h4>Updates fehlgeschlagen</h4>
+                                <p>Überprüfen Sie die Internetverbindung</p>
+                                <button class="btn small">Lösung anzeigen</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tutorials -->
+                    <div class="card">
+                        <h3>📖 Tutorials & Links</h3>
+                        <div class="tutorials-list">
+                            <a href="https://wiki.archlinux.org/" target="_blank" class="tutorial-link">
+                                📚 Arch Linux Wiki
+                            </a>
+                            <a href="https://www.linux.org/" target="_blank" class="tutorial-link">
+                                🐧 Linux.org Tutorials
+                            </a>
+                            <a href="https://www.gnu.org/software/bash/manual/" target="_blank" class="tutorial-link">
+                                💻 Bash Handbuch
+                            </a>
+                            <a href="https://www.ssh.com/ssh/" target="_blank" class="tutorial-link">
+                                🔐 SSH Tutorial
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Tips -->
+                    <div class="card">
+                        <h3>💡 Tipps für Einsteiger</h3>
+                        <div class="tips-list">
+                            <div class="tip">
+                                <strong>Terminal öffnen:</strong> Strg+Alt+T
+                            </div>
+                            <div class="tip">
+                                <strong>Dateimanager:</strong> Super+E
+                            </div>
+                            <div class="tip">
+                                <strong>Anwendungen:</strong> Super+A
+                            </div>
+                            <div class="tip">
+                                <strong>System-Updates:</strong> Regelmäßig ausführen
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal Tab -->
+            <div class="tab-content" id="terminal-tab">
+                <div class="tab-header">
+                    <h2>💻 Terminal-Simulator</h2>
+                    <div class="terminal-controls">
+                        <button class="btn small" id="clear-terminal">Löschen</button>
+                        <button class="btn small" id="new-terminal">Neues Terminal</button>
+                    </div>
+                </div>
+                
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <span class="terminal-title">Terminal</span>
+                        <div class="terminal-buttons">
+                            <span class="terminal-btn minimize">─</span>
+                            <span class="terminal-btn maximize">□</span>
+                            <span class="terminal-btn close">×</span>
+                        </div>
+                    </div>
+                    <div class="terminal-body" id="terminal-output">
+                        <div class="terminal-line">
+                            <span class="prompt">user@archlinux:~$</span>
+                            <span class="command" contenteditable="true" id="terminal-input"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

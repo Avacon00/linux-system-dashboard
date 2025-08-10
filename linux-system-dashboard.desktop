@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Linux System Dashboard
+Name[de]=Linux System Dashboard
+Comment=Ein modernes System-Dashboard für Linux Arch
+Comment[de]=Ein modernes System-Dashboard für Linux Arch
+Exec=/usr/local/bin/linux-system-dashboard
+Icon=/usr/local/share/icons/linux-system-dashboard.png
+Terminal=false
+Categories=System;Monitor;Utility;
+Keywords=system;monitor;dashboard;linux;arch;
+StartupNotify=true
+StartupWMClass=Linux System Dashboard
