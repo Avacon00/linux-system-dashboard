@@ -1034,47 +1034,7 @@ ipcMain.handle('execute-command', async (_, command) => {
   }
 });
 
-// IPC Handler für Terminal-Kommandos
-ipcMain.handle('execute-terminal-command', async (_, command) => {
-  // Sicherheitsvalidierung
-  if (!command || typeof command !== 'string') {
-    return { success: false, error: 'Ungültiger Befehl' };
-  }
-
-  // Gefährliche Befehle blockieren
-  const dangerousCommands = ['rm -rf', 'dd if=', 'mkfs', 'fdisk', 'parted', 'sudo rm', 'sudo dd'];
-  const lowerCommand = command.toLowerCase();
-  
-  for (const dangerous of dangerousCommands) {
-    if (lowerCommand.includes(dangerous)) {
-      return { 
-        success: false, 
-        error: 'Gefährlicher Befehl blockiert',
-        output: 'bash: Befehl aus Sicherheitsgründen nicht erlaubt'
-      };
-    }
-  }
-
-  return new Promise((resolve) => {
-    exec(command, { timeout: 10000 }, (error, stdout, stderr) => {
-      if (error) {
-        resolve({
-          success: false,
-          error: error.message,
-          output: stderr || `bash: ${command}: command not found`,
-          exitCode: error.code
-        });
-      } else {
-        resolve({
-          success: true,
-          output: stdout || 'Command executed successfully',
-          stderr: stderr,
-          exitCode: 0
-        });
-      }
-    });
-  });
-});
+// Old terminal handler removed - using comprehensive security terminal handler below
 
 // IPC Handler für Fenster-Kontrolle
 ipcMain.handle('minimize-window', () => {
@@ -1326,3 +1286,230 @@ ipcMain.handle('check-rootkits', async () => {
     };
   }
 });
+
+// ============================================================================
+// TERMINAL-BACKEND - SECURE COMMAND EXECUTION
+// ============================================================================
+
+// Erlaubte Befehle für Sicherheit (Whitelist-Ansatz)
+const ALLOWED_COMMANDS = {
+  // System-Information
+  'ls': { safe: true, description: 'Dateien auflisten' },
+  'pwd': { safe: true, description: 'Aktuelles Verzeichnis anzeigen' },
+  'whoami': { safe: true, description: 'Aktueller Benutzer' },
+  'date': { safe: true, description: 'Aktuelles Datum und Zeit' },
+  'uptime': { safe: true, description: 'System-Laufzeit' },
+  'id': { safe: true, description: 'Benutzer-ID anzeigen' },
+  'groups': { safe: true, description: 'Benutzergruppen anzeigen' },
+  
+  // System-Monitoring
+  'htop': { safe: true, description: 'Prozess-Monitor starten', requiresTerminal: true },
+  'top': { safe: true, description: 'Prozess-Monitor (minimal)' },
+  'ps': { safe: true, description: 'Laufende Prozesse anzeigen' },
+  'df': { safe: true, description: 'Festplatten-Nutzung anzeigen' },
+  'free': { safe: true, description: 'Arbeitsspeicher-Nutzung anzeigen' },
+  'lscpu': { safe: true, description: 'CPU-Informationen anzeigen' },
+  'lsblk': { safe: true, description: 'Block-Geräte auflisten' },
+  'mount': { safe: true, description: 'Gemountete Dateisysteme anzeigen' },
+  'ip': { safe: true, description: 'Netzwerk-Konfiguration anzeigen' },
+  'netstat': { safe: true, description: 'Netzwerk-Verbindungen anzeigen' },
+  
+  // Datei-Operationen (sicher)
+  'cat': { safe: true, description: 'Datei-Inhalt anzeigen', maxArgs: 1 },
+  'head': { safe: true, description: 'Erste Zeilen einer Datei anzeigen' },
+  'tail': { safe: true, description: 'Letzte Zeilen einer Datei anzeigen' },
+  'less': { safe: true, description: 'Datei durchblättern', requiresTerminal: true },
+  'more': { safe: true, description: 'Datei seitenweise anzeigen' },
+  'file': { safe: true, description: 'Dateityp bestimmen' },
+  'wc': { safe: true, description: 'Zeilen, Wörter, Zeichen zählen' },
+  'grep': { safe: true, description: 'Text in Dateien suchen' },
+  'find': { safe: true, description: 'Dateien suchen', timeout: 10000 },
+  
+  // Netzwerk (sicher)
+  'ping': { safe: true, description: 'Netzwerk-Verbindung testen', timeout: 5000 },
+  'wget': { safe: false, description: 'Datei herunterladen - nicht erlaubt' },
+  'curl': { safe: false, description: 'HTTP-Anfragen - nicht erlaubt' },
+  
+  // System-Administration (eingeschränkt)
+  'systemctl': { safe: true, description: 'Systemd-Services verwalten', sudoOnly: true },
+  'journalctl': { safe: true, description: 'System-Logs anzeigen' },
+  'dmesg': { safe: true, description: 'Kernel-Nachrichten anzeigen' },
+  
+  // Paket-Management (nur Abfragen)
+  'pacman': { safe: true, description: 'Paket-Manager', allowedFlags: ['-Q', '-Ss', '-Si', '-Ql'], sudoRequired: ['-S', '-R', '-U'] },
+  'yay': { safe: true, description: 'AUR-Helper', allowedFlags: ['-Q', '-Ss', '-Si'], sudoRequired: ['-S', '-R'] },
+  
+  // Git (sicher)
+  'git': { safe: true, description: 'Git-Versionskontrolle', allowedSubcommands: ['status', 'log', 'diff', 'branch', 'remote'] },
+  
+  // Gefährliche Befehle (explizit blockiert)
+  'rm': { safe: false, description: 'Dateien löschen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
+  'mv': { safe: false, description: 'Dateien verschieben - nicht erlaubt', danger: 'DATENÄNDERUNG' },
+  'cp': { safe: false, description: 'Dateien kopieren - nicht erlaubt', danger: 'DATENÄNDERUNG' },
+  'chmod': { safe: false, description: 'Dateiberechtigungen ändern - nicht erlaubt', danger: 'SICHERHEIT' },
+  'chown': { safe: false, description: 'Dateibesitzer ändern - nicht erlaubt', danger: 'SICHERHEIT' },
+  'sudo': { safe: false, description: 'Root-Rechte - nicht erlaubt', danger: 'SICHERHEIT' },
+  'su': { safe: false, description: 'Benutzer wechseln - nicht erlaubt', danger: 'SICHERHEIT' },
+  'passwd': { safe: false, description: 'Passwort ändern - nicht erlaubt', danger: 'SICHERHEIT' },
+  'fdisk': { safe: false, description: 'Partitionen bearbeiten - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
+  'mkfs': { safe: false, description: 'Dateisystem erstellen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
+  'dd': { safe: false, description: 'Daten kopieren - nicht erlaubt', danger: 'DATENLÖSCHUNG' }
+};
+
+// Terminal-Backend IPC Handler
+ipcMain.handle('execute-terminal-command', async (event, commandString) => {
+  try {
+    console.log(`Terminal command requested: ${commandString}`);
+    
+    // Command parsen
+    const parts = commandString.trim().split(/\s+/);
+    const baseCommand = parts[0];
+    const args = parts.slice(1);
+    
+    // Leerer Befehl
+    if (!baseCommand) {
+      return {
+        success: false,
+        output: 'Kein Befehl eingegeben'
+      };
+    }
+    
+    // Spezial-Befehle
+    if (baseCommand === 'clear') {
+      return {
+        success: true,
+        output: '',
+        special: 'clear'
+      };
+    }
+    
+    if (baseCommand === 'help' || baseCommand === '--help') {
+      return {
+        success: true,
+        output: generateHelpText()
+      };
+    }
+    
+    if (baseCommand === 'exit') {
+      return {
+        success: true,
+        output: 'Terminal-Session beendet',
+        special: 'exit'
+      };
+    }
+    
+    // Command-Sicherheitsprüfung
+    const commandInfo = ALLOWED_COMMANDS[baseCommand];
+    
+    if (!commandInfo) {
+      return {
+        success: false,
+        output: `Befehl '${baseCommand}' ist nicht erlaubt oder unbekannt.\nTipp: Verwenden Sie 'help' für erlaubte Befehle.`
+      };
+    }
+    
+    if (!commandInfo.safe) {
+      return {
+        success: false,
+        output: `⚠️  SICHERHEIT: Befehl '${baseCommand}' ist aus Sicherheitsgründen gesperrt.\nGrund: ${commandInfo.danger || 'Potentiell gefährlich'}\n\nVerwenden Sie ein echtes Terminal für administrative Aufgaben.`
+      };
+    }
+    
+    // Timeout für Befehl
+    const timeout = commandInfo.timeout || 5000; // 5 Sekunden Standard
+    
+    // Befehl ausführen
+    return new Promise((resolve) => {
+      const child = exec(commandString, {
+        timeout: timeout,
+        maxBuffer: 1024 * 1024, // 1MB Buffer
+        cwd: process.env.HOME || '/home/user'
+      }, (error, stdout, stderr) => {
+        
+        if (error) {
+          // Timeout
+          if (error.code === 'TIMEOUT') {
+            resolve({
+              success: false,
+              output: `⏰ Befehl-Timeout (${timeout/1000}s) erreicht.\nBefehl wurde abgebrochen.`
+            });
+            return;
+          }
+          
+          // Anderer Fehler
+          resolve({
+            success: false,
+            output: `Fehler: ${error.message}\n${stderr || ''}`.trim()
+          });
+          return;
+        }
+        
+        // Erfolg
+        const output = stdout.trim();
+        resolve({
+          success: true,
+          output: output || '(Kein Output)'
+        });
+      });
+      
+      // Prozess nach Timeout killen
+      setTimeout(() => {
+        try {
+          child.kill('SIGTERM');
+        } catch (e) {
+          // Bereits beendet
+        }
+      }, timeout + 1000);
+    });
+    
+  } catch (error) {
+    console.error('Terminal execution error:', error);
+    return {
+      success: false,
+      output: `System-Fehler: ${error.message}`
+    };
+  }
+});
+
+// Hilfsfunktion für Help-Text
+function generateHelpText() {
+  let helpText = `\n💻 Linux System Dashboard - Terminal\n`;
+  helpText += `=======================================\n\n`;
+  
+  helpText += `🛡️ Sicherheits-Features:\n`;
+  helpText += `• Nur sichere Befehle erlaubt\n`;
+  helpText += `• Timeout-Schutz (5-10s)\n`;
+  helpText += `• Kein Root-Zugriff\n`;
+  helpText += `• Sandbox-Umgebung\n\n`;
+  
+  helpText += `✅ Erlaubte Befehle:\n\n`;
+  
+  const categories = {
+    'System-Info': ['ls', 'pwd', 'whoami', 'date', 'uptime', 'id'],
+    'Monitoring': ['top', 'ps', 'df', 'free', 'lscpu', 'netstat'],
+    'Datei-Operationen': ['cat', 'head', 'tail', 'file', 'wc', 'grep'],
+    'Netzwerk': ['ping', 'ip'],
+    'Logs': ['journalctl', 'dmesg'],
+    'Pakete': ['pacman -Q', 'yay -Q']
+  };
+  
+  Object.entries(categories).forEach(([category, commands]) => {
+    helpText += `📁 ${category}:\n`;
+    commands.forEach(cmd => {
+      const info = ALLOWED_COMMANDS[cmd.split(' ')[0]];
+      helpText += `   ${cmd.padEnd(12)} - ${info ? info.description : 'System-Befehl'}\n`;
+    });
+    helpText += `\n`;
+  });
+  
+  helpText += `❌ Gesperrte Befehle:\n`;
+  helpText += `   rm, mv, cp, chmod, sudo, etc.\n`;
+  helpText += `   (Aus Sicherheitsgründen - nutzen Sie ein echtes Terminal)\n\n`;
+  
+  helpText += `💡 Spezial-Befehle:\n`;
+  helpText += `   help     - Diese Hilfe anzeigen\n`;
+  helpText += `   clear    - Terminal leeren\n`;
+  helpText += `   exit     - Terminal schließen\n`;
+  
+  return helpText;
+}

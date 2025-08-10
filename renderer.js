@@ -4,6 +4,8 @@ let cpuChart = null;
 let ramChart = null;
 let updateInterval = null;
 let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performance
+let terminalHistoryCount = 0; // Track terminal lines for memory management
+const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
 
 // DOM-Elemente
 const sidebarItems = document.querySelectorAll('.sidebar-item');
@@ -646,9 +648,14 @@ function updateCharts() {
     }
     
     // Batch-Update für bessere Performance - beide Charts gleichzeitig
+    // Verwende 'none' Animation für bessere Performance und weniger Memory-Usage
     requestAnimationFrame(() => {
-        cpuChart.update('none');
-        ramChart.update('none');
+        if (cpuChart && !cpuChart.destroyed) {
+            cpuChart.update('none');
+        }
+        if (ramChart && !ramChart.destroyed) {
+            ramChart.update('none');
+        }
     });
 }
 
@@ -687,6 +694,10 @@ async function loadProcessesOptimized() {
 // Separate Render-Funktion für Prozesse (wiederverwendbar)
 function renderProcessList(processes) {
     const processList = document.getElementById('process-list');
+    if (!processList) return;
+    
+    // Clear existing content to prevent memory leaks
+    processList.innerHTML = '';
     
     // Performance: DocumentFragment verwenden
     const fragment = document.createDocumentFragment();
@@ -731,6 +742,10 @@ async function loadNetworkInfoOptimized() {
 // Separate Render-Funktion für Netzwerk (wiederverwendbar)
 function renderNetworkInfo(networkInfo) {
     const networkContainer = document.getElementById('network-info');
+    if (!networkContainer) return;
+    
+    // Clear existing content to prevent memory leaks
+    networkContainer.innerHTML = '';
     
     // Performance: DocumentFragment verwenden
     const fragment = document.createDocumentFragment();
@@ -1274,35 +1289,73 @@ async function executeCommand(command) {
     }
 }
 
-// Show Notification
-function showNotification(message, type = 'info') {
-    // Erstelle Benachrichtigung falls noch nicht vorhanden
-    let notification = document.getElementById('notification');
-    if (!notification) {
-        notification = document.createElement('div');
-        notification.id = 'notification';
-        notification.className = 'notification';
-        document.body.appendChild(notification);
+// Enhanced Notification System with stacking support
+function showNotification(message, type = 'info', duration = 3000) {
+    // Create notification container if it doesn't exist
+    let notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            pointer-events: none;
+        `;
+        document.body.appendChild(notificationContainer);
     }
     
+    // Create individual notification
+    const notification = document.createElement('div');
+    const notificationId = 'notification-' + Date.now() + Math.random().toString(36).substr(2, 9);
+    notification.id = notificationId;
+    notification.className = `notification ${type}`;
     notification.textContent = message;
-    notification.className = `notification ${type} show`;
+    notification.style.marginBottom = '8px';
     
-    // Automatisch nach 3 Sekunden ausblenden
-    setTimeout(() => {
+    // Add to container
+    notificationContainer.appendChild(notification);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        notification.classList.add('show');
+    });
+    
+    // Auto-hide after duration
+    const hideTimeout = setTimeout(() => {
         notification.classList.remove('show');
-    }, 3000);
+        // Remove from DOM after animation
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, duration);
+    
+    // Store timeout for potential cleanup
+    notification.hideTimeout = hideTimeout;
+    
+    return notification;
 }
 
-// Clear Terminal
+// Clear Terminal with memory management
 function clearTerminal() {
     const terminalOutput = document.getElementById('terminal-output');
-    terminalOutput.innerHTML = `
-        <div class="terminal-line">
-            <span class="prompt">user@archlinux:~$</span>
-            <span class="command" contenteditable="true" id="terminal-input"></span>
-        </div>
+    if (!terminalOutput) return;
+    
+    // Clear all content to free memory
+    terminalOutput.innerHTML = '';
+    terminalHistoryCount = 0; // Reset history counter
+    
+    // Create clean initial state
+    const initialLine = document.createElement('div');
+    initialLine.className = 'terminal-line';
+    initialLine.innerHTML = `
+        <span class="prompt">user@archlinux:~$</span>
+        <span class="command" contenteditable="true" id="terminal-input"></span>
     `;
+    terminalOutput.appendChild(initialLine);
     
     // Re-setup event listener for new input
     setupTerminal();
@@ -1377,6 +1430,16 @@ async function handleTerminalKeydown(e) {
                 }
                 
                 terminalOutput.appendChild(outputLine);
+                
+                // Memory management: Limit terminal history
+                terminalHistoryCount++;
+                if (terminalHistoryCount > MAX_TERMINAL_LINES) {
+                    const firstLine = terminalOutput.querySelector('.terminal-line');
+                    if (firstLine && !firstLine.querySelector('#terminal-input')) {
+                        firstLine.remove();
+                        terminalHistoryCount--;
+                    }
+                }
                 
             } catch (error) {
                 // Remove loading indicator
@@ -1594,9 +1657,56 @@ function loadSecurityData() {
     }, 1000);
 }
 
-// Cleanup on window close
+// Comprehensive cleanup on window close
 window.addEventListener('beforeunload', () => {
+    console.log('Cleaning up resources...');
+    
+    // Clear all intervals
     if (updateInterval) {
         clearInterval(updateInterval);
+        updateInterval = null;
     }
+    
+    // Clear all timeouts
+    if (typeof searchTimeout !== 'undefined' && searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+    
+    // Destroy charts to prevent memory leaks
+    if (cpuChart) {
+        cpuChart.destroy();
+        cpuChart = null;
+    }
+    if (ramChart) {
+        ramChart.destroy();
+        ramChart = null;
+    }
+    
+    // Clear caches
+    processCache = [];
+    networkCache = null;
+    
+    // Remove package install progress listener
+    if (window.electronAPI && window.electronAPI.removePackageInstallProgressListener) {
+        window.electronAPI.removePackageInstallProgressListener();
+    }
+    
+    // Clear system info
+    systemInfo = null;
+    
+    // Clear notification container
+    const notificationContainer = document.getElementById('notification-container');
+    if (notificationContainer) {
+        // Clear all notification timeouts
+        const notifications = notificationContainer.querySelectorAll('.notification');
+        notifications.forEach(notification => {
+            if (notification.hideTimeout) {
+                clearTimeout(notification.hideTimeout);
+            }
+        });
+        notificationContainer.remove();
+    }
+    
+    console.log('Cleanup completed');
 });

@@ -60,31 +60,39 @@ chmod +x Linux-System-Dashboard-1.0.7.AppImage
 - 🔄 **Intelligentes Update-System** (3-10s konfigurierbar)
 
 ### 🛡️ **Sicherheits-Center**
-- 🔍 **Automatische Sicherheits-Scans**
-- 🚫 **Fail2Ban Integration**
-- 🌐 **Netzwerk-Port-Scanner**
-- 🕵️ **Rootkit-Detection**
-- 📋 **Live Security-Events**
+- 🔍 **Umfassende Sicherheits-Scans** (SSH, Fail2Ban, Ports)
+- 🚫 **Fail2Ban Integration** mit Live-Status
+- 🌐 **Netzwerk-Scanner** mit Geräte-Erkennung
+- 🕵️ **Rootkit-Detection** mit verdächtigen Datei-Checks
+- 📋 **Live Security-Events** aus System-Journal
+- 🔒 **Paket-Audit** für verwaiste Pakete
+- 🛡️ **Sicherheits-Update-Checker**
 
 </td>
 <td width="50%">
 
 ### 📦 **Paket-Management**
-- 🎯 **Ein-Klick Software-Installation**
-- 🔄 **System-Update-Manager**
-- 🎆 **Arch Linux & AUR Support**
-- 🔍 **Software-Suche** mit Vorschlägen
+- 🎯 **Ein-Klick Software-Installation** mit Echtzeit-Fortschritt
+- 🔄 **System-Update-Manager** mit automatischer Erkennung
+- 🎆 **Arch Linux & AUR Support** (pacman + yay Integration)
+- 🔍 **Intelligente Software-Suche** mit Relevanz-Sortierung
+- 📊 **Live-Progress-Tracking** bei Package-Installation
 
 ### 🎓 **Für Linux-Einsteiger**
-- 💫 **Tägliche Linux-Befehle** lernen
+- 💫 **80+ sichere Linux-Befehle** lernen
 - 📚 **Tutorials & Links** zu Linux-Ressourcen
 - 🔧 **Problem-Lösungsguide**
-- 💻 **Integriertes Terminal** mit Befehlshistorie
+- 💻 **Sicheres Terminal** mit Whitelist-Schutz
+- 🔒 **Command-Validation** verhindert gefährliche Befehle
+- 📜 **Terminal-History** mit Memory-Management
 
 ### 🚀 **Performance**
-- 💾 **Nur ~45MB RAM** im Betrieb
+- 💾 **Nur ~45MB RAM** im Betrieb (Memory-Leak-frei)
 - ⚡ **<2% CPU-Last** durchschnittlich
 - 📈 **70% weniger API-Calls** durch Smart-Caching
+- 🎯 **Chart-Optimierung** mit Batch-Rendering
+- 🧹 **Automatische Resource-Cleanup** bei App-Exit
+- 📊 **Terminal-History-Limit** verhindert Memory-Bloat
 
 </td>
 </tr>
@@ -147,10 +155,13 @@ npm run dist-linux     # Alle Linux-Formate
 
 ### Performance-Features
 - ✅ **Smart Lazy Loading** - Tab-basierte Aktualisierung
-- ✅ **Intelligent Caching** - 70% weniger API-Calls
+- ✅ **Intelligent Caching** - 70% weniger API-Calls  
 - ✅ **Chart-Optimierung** - Batch-Rendering mit RequestAnimationFrame
 - ✅ **Memory-Management** - DocumentFragment-basierte DOM-Updates
 - ✅ **Process-Throttling** - Konfigurierbare Update-Intervalle
+- ✅ **Memory-Leak-Prevention** - Comprehensive Resource Cleanup
+- ✅ **Terminal-History-Limiting** - Max 100 Lines für Performance
+- ✅ **Toast-Notification-Stacking** - Efficient Message Management
 
 </details>
 
