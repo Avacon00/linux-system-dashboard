@@ -3,7 +3,14 @@ const path = require('path');
 const si = require('systeminformation');
 const { exec } = require('child_process');
 const fs = require('fs');
-const AutoUpdater = require('./auto-updater');
+// Auto-Updater - robust laden
+let AutoUpdater;
+try {
+  AutoUpdater = require('./auto-updater');
+} catch (error) {
+  console.log('Auto-Updater nicht verfügbar:', error.message);
+  AutoUpdater = null;
+}
 
 let mainWindow;
 let autoUpdater;
@@ -29,11 +36,18 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     
-    // Auto-Updater initialisieren (nur in Production)
-    if (!process.argv.includes('--dev') && app.isPackaged) {
-      autoUpdater = new AutoUpdater(mainWindow);
-      autoUpdater.checkForUpdatesOnStartup();
-      autoUpdater.startPeriodicUpdateCheck();
+    // Auto-Updater initialisieren (nur in Production und wenn verfügbar)
+    if (!process.argv.includes('--dev') && app.isPackaged && AutoUpdater) {
+      try {
+        autoUpdater = new AutoUpdater(mainWindow);
+        autoUpdater.checkForUpdatesOnStartup();
+        autoUpdater.startPeriodicUpdateCheck();
+        console.log('Auto-Updater erfolgreich initialisiert');
+      } catch (error) {
+        console.log('Auto-Updater konnte nicht initialisiert werden:', error.message);
+      }
+    } else {
+      console.log('Auto-Updater übersprungen (lokaler Test)');
     }
   });
 
