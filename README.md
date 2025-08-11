@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Linux System Dashboard](assets/icon-512.png)
+![Linux System Dashboard](assets/2f5c7803-01b0-4067-9a58-45a35d5fbfe0.jpg)
 
 **Das modernste und einfachste System-Dashboard für Linux**
 
@@ -210,4 +210,5 @@ Idee für ein neues Feature? [Feature vorschlagen](https://github.com/Avacon00/l
 [⬆️ **Nach oben**](#-linux-system-dashboard)
 
 </div>
+
 
