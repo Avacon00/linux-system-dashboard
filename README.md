@@ -57,6 +57,8 @@ chmod +x Linux-System-Dashboard-1.0.7.AppImage
 - 📊 **Interaktive Charts** (performance-optimiert)
 - 🔥 **Pro-Core CPU-Monitoring**
 - 🌡️ **Temperatur-Überwachung**
+- 📡 **Live Network Speed Tracking** (Download/Upload in Echtzeit)
+- 💾 **Enhanced Memory Info** (active, buffers, cached)
 - 🔄 **Intelligentes Update-System** (3-10s konfigurierbar)
 
 ### 🛡️ **Sicherheits-Center**
@@ -162,6 +164,8 @@ npm run dist-linux     # Alle Linux-Formate
 - ✅ **Memory-Leak-Prevention** - Comprehensive Resource Cleanup
 - ✅ **Terminal-History-Limiting** - Max 100 Lines für Performance
 - ✅ **Toast-Notification-Stacking** - Efficient Message Management
+- ✅ **Live Network Speed Monitoring** - 0.5s Updates ohne UI-Lag
+- ✅ **Enhanced Memory Tracking** - Optimierte RAM-Anzeige
 
 </details>
 
