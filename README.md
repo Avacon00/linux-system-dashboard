@@ -33,13 +33,13 @@
 
 ```bash
 # 1. Download (oder Browser-Download)
-wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.0.7.AppImage
+wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.0.8.AppImage
 
 # 2. Ausführbar machen
-chmod +x Linux-System-Dashboard-1.0.7.AppImage
+chmod +x Linux-System-Dashboard-1.0.8.AppImage
 
 # 3. Starten
-./Linux-System-Dashboard-1.0.7.AppImage
+./Linux-System-Dashboard-1.0.8.AppImage
 ```
 
 **Das war's!** 🎉 Keine Installation, keine Konfiguration, keine Probleme!
@@ -210,3 +210,4 @@ Idee für ein neues Feature? [Feature vorschlagen](https://github.com/Avacon00/l
 [⬆️ **Nach oben**](#-linux-system-dashboard)
 
 </div>
+
