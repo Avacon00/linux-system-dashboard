@@ -112,9 +112,12 @@ ipcMain.handle('get-system-info', async () => {
       },
       memory: {
         total: mem.total,
-        used: mem.used,
+        used: mem.active || (mem.total - mem.available),
         free: mem.free,
-        active: mem.active
+        active: mem.active,
+        available: mem.available,
+        buffers: mem.buffers,
+        cached: mem.cached
       },
       disk: disk.map(d => ({
         fs: d.fs,
@@ -268,6 +271,9 @@ ipcMain.handle('get-processes', async () => {
   }
 });
 
+// Global variables for network speed calculation
+let previousNetworkStats = {};
+
 // IPC Handler für Netzwerk-Informationen
 ipcMain.handle('get-network-info', async () => {
   try {
@@ -285,6 +291,61 @@ ipcMain.handle('get-network-info', async () => {
     return null;
   }
 });
+
+// Essential Network Speed Handler
+ipcMain.handle('get-network-speeds', async () => {
+  try {
+    const networkStats = await si.networkStats();
+    const currentTime = Date.now();
+    let networkSpeeds = {};
+
+    networkStats.forEach(stat => {
+      const interfaceName = stat.iface;
+      if (previousNetworkStats[interfaceName]) {
+        const timeDiff = (currentTime - previousNetworkStats[interfaceName].timestamp) / 1000;
+        if (timeDiff > 0) {
+          const downloadSpeed = Math.max(0, (stat.rx_bytes - previousNetworkStats[interfaceName].rx_bytes) / timeDiff);
+          const uploadSpeed = Math.max(0, (stat.tx_bytes - previousNetworkStats[interfaceName].tx_bytes) / timeDiff);
+          
+          networkSpeeds[interfaceName] = {
+            downloadSpeed: downloadSpeed,
+            uploadSpeed: uploadSpeed,
+            downloadFormatted: formatNetworkSpeed(downloadSpeed),
+            uploadFormatted: formatNetworkSpeed(uploadSpeed)
+          };
+        }
+      }
+      
+      previousNetworkStats[interfaceName] = {
+        rx_bytes: stat.rx_bytes,
+        tx_bytes: stat.tx_bytes,
+        timestamp: currentTime
+      };
+    });
+
+    return { speeds: networkSpeeds };
+  } catch (error) {
+    console.error('Network speed error:', error);
+    return { speeds: {} };
+  }
+});
+
+// Helper function to format network speeds
+function formatNetworkSpeed(bytesPerSecond) {
+  if (bytesPerSecond === 0) return '0.00 B/s';
+  
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let value = bytesPerSecond;
+  let unitIndex = 0;
+  
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  
+  const decimals = value < 1 && unitIndex > 0 ? 3 : 2;
+  return `${value.toFixed(decimals)} ${units[unitIndex]}`;
+}
 
 // IPC Handler für System-Updates
 ipcMain.handle('check-updates', async () => {

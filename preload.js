@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   getProcesses: () => ipcRenderer.invoke('get-processes'),
   getNetworkInfo: () => ipcRenderer.invoke('get-network-info'),
+  getNetworkSpeeds: () => ipcRenderer.invoke('get-network-speeds'),
   
   // System Actions
   checkUpdates: () => ipcRenderer.invoke('check-updates'),
