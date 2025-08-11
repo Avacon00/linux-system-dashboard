@@ -73,3 +73,5 @@ logs
 # Temporary files
 tmp/
 temp/
+*.tar.gz
+dist/
