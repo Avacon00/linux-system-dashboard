@@ -75,3 +75,4 @@ tmp/
 temp/
 *.tar.gz
 dist/
+CLAUDE.md
