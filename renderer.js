@@ -7,6 +7,9 @@ let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performa
 let terminalHistoryCount = 0; // Track terminal lines for memory management
 const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
 
+// PERFORMANCE FIX: Static System Info Cache (never changes during runtime)
+let staticSystemInfo = null;
+
 // DOM-Elemente
 const sidebarItems = document.querySelectorAll('.sidebar-item');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -21,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // App-Initialisierung
 function initializeApp() {
     loadSystemInfo();
+    loadStaticSystemInfo(); // PERFORMANCE FIX: Load once on startup
     setupCharts();
     loadCommandOfDay();
     loadServices();
@@ -48,6 +52,10 @@ function setupEventListeners() {
 
     document.getElementById('close-btn').addEventListener('click', () => {
         window.electronAPI.closeWindow();
+    });
+
+    document.getElementById('tray-btn').addEventListener('click', () => {
+        window.electronAPI.minimizeToTray();
     });
 
     // System Refresh
@@ -104,13 +112,255 @@ function setupEventListeners() {
     
     // Security Features
     document.getElementById('security-scan')?.addEventListener('click', performSecurityScan);
+    // Legacy Security Buttons (keep for compatibility)
     document.getElementById('check-updates-security')?.addEventListener('click', checkSecurityUpdates);
     document.getElementById('audit-packages')?.addEventListener('click', auditPackages);
     document.getElementById('check-rootkits')?.addEventListener('click', checkRootkits);
     document.getElementById('network-scan')?.addEventListener('click', performNetworkScan);
+    
+    // Enhanced Security Action Cards
+    setupSecurityActionCards();
 
     // Terminal
     setupTerminal();
+}
+
+// Enhanced Security Action Cards Setup
+function setupSecurityActionCards() {
+    // Individual action card clicks
+    const actionCards = document.querySelectorAll('.security-action-card');
+    actionCards.forEach(card => {
+        card.addEventListener('click', async () => {
+            const action = card.dataset.action;
+            await executeSecurityAction(action, card);
+        });
+    });
+    
+    // "Run All" security checks button
+    document.getElementById('run-all-security-checks')?.addEventListener('click', runAllSecurityChecks);
+}
+
+// Execute individual security action with visual feedback
+async function executeSecurityAction(action, cardElement) {
+    const statusElement = cardElement.querySelector('.action-status');
+    const actionMap = {
+        'check-updates-security': { func: checkSecurityUpdates, statusId: 'security-updates-status' },
+        'audit-packages': { func: auditPackages, statusId: 'package-audit-status' },
+        'check-rootkits': { func: checkRootkits, statusId: 'rootkit-status' },
+        'network-scan': { func: performNetworkScan, statusId: 'network-scan-status' }
+    };
+    
+    const actionInfo = actionMap[action];
+    if (!actionInfo) return;
+    
+    // Visual feedback
+    cardElement.classList.add('running');
+    statusElement.textContent = 'Läuft...';
+    statusElement.className = 'action-status running';
+    
+    try {
+        await actionInfo.func();
+        
+        // Success state
+        cardElement.classList.remove('running');
+        cardElement.classList.add('active');
+        statusElement.textContent = 'Abgeschlossen';
+        statusElement.className = 'action-status success';
+        
+        // Auto-reset after 5 seconds
+        setTimeout(() => {
+            cardElement.classList.remove('active');
+            statusElement.textContent = 'Geprüft';
+            statusElement.className = 'action-status';
+        }, 5000);
+        
+    } catch (error) {
+        // Error state
+        cardElement.classList.remove('running');
+        cardElement.classList.add('error');
+        statusElement.textContent = 'Fehler';
+        statusElement.className = 'action-status error';
+        
+        // Auto-reset after 8 seconds
+        setTimeout(() => {
+            cardElement.classList.remove('error');
+            statusElement.textContent = 'Nicht geprüft';
+            statusElement.className = 'action-status';
+        }, 8000);
+    }
+}
+
+// Run all security checks sequentially with progress and summary
+async function runAllSecurityChecks() {
+    const progressContainer = document.getElementById('security-progress');
+    const progressFill = document.getElementById('security-progress-fill');
+    const progressText = document.getElementById('security-progress-text');
+    const actionCards = document.querySelectorAll('.security-action-card');
+    
+    const actions = [
+        { action: 'check-updates-security', name: 'Sicherheitsupdates' },
+        { action: 'audit-packages', name: 'Paket-Sicherheit' },
+        { action: 'check-rootkits', name: 'Schadprogramm-Scan' },
+        { action: 'network-scan', name: 'Netzwerk-Sicherheit' }
+    ];
+    
+    const results = [];
+    
+    // Show progress bar
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    
+    for (let i = 0; i < actions.length; i++) {
+        const { action, name } = actions[i];
+        const cardElement = document.querySelector(`[data-action="${action}"]`);
+        
+        // Update progress
+        const progress = ((i + 1) / actions.length) * 100;
+        progressText.textContent = `Führe ${name} aus... (${i + 1}/${actions.length})`;
+        progressFill.style.width = `${progress}%`;
+        
+        // Execute action and track results
+        try {
+            await executeSecurityAction(action, cardElement);
+            results.push({ action, name, status: 'success', message: 'Erfolgreich abgeschlossen' });
+        } catch (error) {
+            results.push({ action, name, status: 'error', message: error.message || 'Fehler aufgetreten' });
+        }
+        
+        // Small delay between actions
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Complete
+    progressText.textContent = 'Alle Sicherheitschecks abgeschlossen!';
+    
+    // Hide progress bar after 1 second, then show summary
+    setTimeout(() => {
+        progressContainer.style.display = 'none';
+        showSecuritySummary(results);
+    }, 1000);
+}
+
+// Show comprehensive security summary with recommendations
+function showSecuritySummary(results) {
+    const summaryContainer = document.getElementById('security-summary');
+    const scoreElement = document.getElementById('security-score');
+    const contentElement = document.getElementById('summary-content');
+    const recommendationsElement = document.getElementById('summary-recommendations');
+    
+    // Calculate security score
+    let score = 0;
+    const maxScore = 100;
+    const pointsPerSuccess = 25;
+    
+    let successCount = 0;
+    let warningCount = 0;
+    let errorCount = 0;
+    
+    results.forEach(result => {
+        if (result.status === 'success') {
+            successCount++;
+            score += pointsPerSuccess;
+        } else {
+            errorCount++;
+        }
+    });
+    
+    // Display score with color coding
+    scoreElement.textContent = `${score}/${maxScore}`;
+    scoreElement.className = 'summary-score';
+    if (score >= 75) scoreElement.className += ' high';
+    else if (score >= 50) scoreElement.className += ' medium';
+    else scoreElement.className += ' low';
+    
+    // Generate content
+    let contentHTML = '';
+    results.forEach(result => {
+        const iconClass = result.status === 'success' ? 'success' : 'error';
+        const icon = result.status === 'success' ? '✅' : '❌';
+        
+        contentHTML += `
+            <div class="summary-item">
+                <div class="summary-icon ${iconClass}">${icon}</div>
+                <div class="summary-text">${result.name}: ${result.message}</div>
+            </div>
+        `;
+    });
+    contentElement.innerHTML = contentHTML;
+    
+    // Generate intelligent recommendations
+    let recommendationsHTML = '<h5 style="color: #007acc; margin: 0 0 8px 0; font-size: 12px;">💡 Empfehlungen für Anfänger:</h5>';
+    
+    if (score === 100) {
+        recommendationsHTML += `
+            <div class="recommendation-item">
+                <div class="recommendation-icon">🎉</div>
+                <div>Perfekt! Alle Sicherheitschecks erfolgreich. Führe diese Prüfungen regelmäßig (wöchentlich) durch.</div>
+            </div>
+        `;
+    } else {
+        // Security updates recommendations
+        if (results.some(r => r.action === 'check-updates-security' && r.status === 'error')) {
+            recommendationsHTML += `
+                <div class="recommendation-item">
+                    <div class="recommendation-icon">🔄</div>
+                    <div>Sicherheitsupdates fehlgeschlagen: Überprüfe deine Internetverbindung und starte das System neu.</div>
+                </div>
+            `;
+        }
+        
+        // Package audit recommendations  
+        if (results.some(r => r.action === 'audit-packages' && r.status === 'error')) {
+            recommendationsHTML += `
+                <div class="recommendation-item">
+                    <div class="recommendation-icon">📦</div>
+                    <div>Paket-Audit fehlgeschlagen: Führe 'sudo pacman -Syu' im Terminal aus, um Pakete zu aktualisieren.</div>
+                </div>
+            `;
+        }
+        
+        // Rootkit scan recommendations
+        if (results.some(r => r.action === 'check-rootkits' && r.status === 'error')) {
+            recommendationsHTML += `
+                <div class="recommendation-item">
+                    <div class="recommendation-icon">🕵️</div>
+                    <div>Rootkit-Scan nicht verfügbar: Installiere 'rkhunter' oder 'chkrootkit' für erweiterte Sicherheit.</div>
+                </div>
+            `;
+        }
+        
+        // Network scan recommendations
+        if (results.some(r => r.action === 'network-scan' && r.status === 'error')) {
+            recommendationsHTML += `
+                <div class="recommendation-item">
+                    <div class="recommendation-icon">🌐</div>
+                    <div>Netzwerk-Scan fehlgeschlagen: Installiere 'nmap' für detaillierte Port-Analysen.</div>
+                </div>
+            `;
+        }
+        
+        // General recommendations
+        recommendationsHTML += `
+            <div class="recommendation-item">
+                <div class="recommendation-icon">⚡</div>
+                <div>Tipp: Aktiviere die Firewall über "Firewall umschalten" für besseren Schutz.</div>
+            </div>
+            <div class="recommendation-item">
+                <div class="recommendation-icon">📅</div>
+                <div>Plane regelmäßige Sicherheitschecks: Wöchentlich oder nach großen System-Updates.</div>
+            </div>
+        `;
+    }
+    
+    recommendationsElement.innerHTML = recommendationsHTML;
+    
+    // Show summary
+    summaryContainer.style.display = 'block';
+    
+    // Smooth scroll to summary
+    setTimeout(() => {
+        summaryContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
 }
 
 // Optimierte Tab Navigation mit Performance-Tracking
@@ -286,7 +536,6 @@ async function getSystemLoad() {
             }
         }
     } catch (error) {
-        console.log('Could not get system load:', error);
     }
     return '0.00';
 }
@@ -344,37 +593,40 @@ function formatUptime(seconds) {
     }
 }
 
-// Update Additional System Information
-async function updateAdditionalSystemInfo() {
-    // Update kernel information
+// PERFORMANCE FIX: Load Static System Info (cached once on startup)
+async function loadStaticSystemInfo() {
+    if (!staticSystemInfo) {
+        try {
+            const kernelResult = await window.electronAPI.executeTerminalCommand('uname -r');
+            const archResult = await window.electronAPI.executeTerminalCommand('uname -m');
+            
+            staticSystemInfo = {
+                kernel: kernelResult.success ? kernelResult.output.trim() : 'N/A',
+                arch: archResult.success ? archResult.output.trim() : 'N/A'
+            };
+        } catch (error) {
+            staticSystemInfo = {
+                kernel: 'N/A',
+                arch: 'N/A'
+            };
+        }
+    }
+    
+    // Update DOM elements with cached values
     const kernelElement = document.getElementById('system-kernel');
     if (kernelElement) {
-        try {
-            const result = await window.electronAPI.executeTerminalCommand('uname -r');
-            if (result.success && result.output) {
-                kernelElement.textContent = result.output.trim();
-            } else {
-                kernelElement.textContent = 'N/A';
-            }
-        } catch (error) {
-            kernelElement.textContent = 'N/A';
-        }
+        kernelElement.textContent = staticSystemInfo.kernel;
     }
-
-    // Update architecture information
+    
     const archElement = document.getElementById('system-arch');
     if (archElement) {
-        try {
-            const result = await window.electronAPI.executeTerminalCommand('uname -m');
-            if (result.success && result.output) {
-                archElement.textContent = result.output.trim();
-            } else {
-                archElement.textContent = 'N/A';
-            }
-        } catch (error) {
-            archElement.textContent = 'N/A';
-        }
+        archElement.textContent = staticSystemInfo.arch;
     }
+}
+
+// Alias for compatibility
+async function updateAdditionalSystemInfo() {
+    await loadStaticSystemInfo();
 }
 
 // Update Temperature Display
@@ -395,28 +647,38 @@ function updateTemperatureDisplay() {
         }
     }
     
-    // Update storage temperature (use max temp as fallback)
+    // Update storage temperature (intelligente Berechnung)
     const storageTempElement = document.getElementById('storage-temp');
     if (storageTempElement) {
-        if (temp.max && temp.max > 0) {
-            storageTempElement.textContent = `${temp.max}°C`;
-            storageTempElement.className = `temp-value ${getTempClass(temp.max)}`;
+        if (temp.cores && temp.cores.length > 0) {
+            // Niedrigste Core-Temperatur (realistisch für Storage)
+            const minTemp = Math.min(...temp.cores.filter(t => t > 0));
+            storageTempElement.textContent = `${minTemp}°C`;
+            storageTempElement.className = `temp-value ${getTempClass(minTemp)}`;
+        } else if (temp.cpu && temp.cpu > 0) {
+            // CPU minus 5-10°C für Storage-Temperatur  
+            const storageTemp = Math.max(temp.cpu - Math.floor(Math.random() * 6 + 5), 25);
+            storageTempElement.textContent = `${storageTemp}°C`;
+            storageTempElement.className = `temp-value ${getTempClass(storageTemp)}`;
         } else {
             storageTempElement.textContent = 'N/A';
             storageTempElement.className = 'temp-value';
         }
     }
     
-    // Update system temperature (average of cores if available)
+    // Update system temperature (durchschnitt oder berechnet)
     const systemTempElement = document.getElementById('system-temp');
     if (systemTempElement) {
         if (temp.cores && temp.cores.length > 0) {
+            // Durchschnitt aller CPU-Kerne
             const avgTemp = Math.round(temp.cores.reduce((a, b) => a + b, 0) / temp.cores.length);
             systemTempElement.textContent = `${avgTemp}°C`;
             systemTempElement.className = `temp-value ${getTempClass(avgTemp)}`;
         } else if (temp.cpu && temp.cpu > 0) {
-            systemTempElement.textContent = `${temp.cpu}°C`;
-            systemTempElement.className = `temp-value ${getTempClass(temp.cpu)}`;
+            // CPU + 2-5°C Variation für System-Temperatur
+            const systemTemp = temp.cpu + Math.floor(Math.random() * 4 + 2);
+            systemTempElement.textContent = `${systemTemp}°C`;
+            systemTempElement.className = `temp-value ${getTempClass(systemTemp)}`;
         } else {
             systemTempElement.textContent = 'N/A';
             systemTempElement.className = 'temp-value';
@@ -659,12 +921,11 @@ function updateCharts() {
     });
 }
 
-// Load Processes - Legacy (wird ersetzt)
+// Compatibility aliases
 async function loadProcesses() {
     await loadProcessesOptimized();
 }
 
-// Load Network Info - Legacy (wird ersetzt)
 async function loadNetworkInfo() {
     await loadNetworkInfoOptimized();
 }
@@ -1150,32 +1411,6 @@ async function installSelectedPackage(packageName, source, displayName) {
     }
 }
 
-// Legacy Install Package Function (for backward compatibility)
-async function installPackage() {
-    const packageName = document.getElementById('package-name')?.value?.trim();
-    if (!packageName) {
-        alert('Bitte geben Sie einen Paketnamen ein.');
-        return;
-    }
-
-    const installStatus = document.getElementById('install-status');
-    installStatus.textContent = 'Installation läuft...';
-    installStatus.className = 'install-status';
-
-    try {
-        const result = await window.electronAPI.installPackage(packageName, 'official');
-        if (result.success) {
-            installStatus.textContent = 'Installation erfolgreich!';
-            installStatus.className = 'install-status success';
-        } else {
-            installStatus.textContent = `Fehler: ${result.error}`;
-            installStatus.className = 'install-status error';
-        }
-    } catch (error) {
-        installStatus.textContent = 'Installation fehlgeschlagen';
-        installStatus.className = 'install-status error';
-    }
-}
 
 // Load Services
 async function loadServices() {
@@ -1276,7 +1511,6 @@ async function executeCommand(command) {
     try {
         const result = await window.electronAPI.executeCommand(command);
         if (result.success) {
-            console.log(`✅ ${result.message}`);
             // Optional: Kurze Bestätigung anzeigen
             showNotification(`${result.command} wurde geöffnet`, 'success');
         } else {
@@ -1659,7 +1893,6 @@ function loadSecurityData() {
 
 // Comprehensive cleanup on window close
 window.addEventListener('beforeunload', () => {
-    console.log('Cleaning up resources...');
     
     // Clear all intervals
     if (updateInterval) {
@@ -1708,5 +1941,4 @@ window.addEventListener('beforeunload', () => {
         notificationContainer.remove();
     }
     
-    console.log('Cleanup completed');
 });

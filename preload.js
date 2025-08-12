@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
+  minimizeToTray: () => ipcRenderer.invoke('minimize-to-tray'),
+  showFromTray: () => ipcRenderer.invoke('show-from-tray'),
   
   // Utility
   formatBytes: (bytes) => {

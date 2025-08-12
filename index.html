@@ -15,9 +15,10 @@
             <span class="title">Linux System Dashboard</span>
         </div>
         <div class="title-bar-right">
-            <button class="title-bar-btn" id="minimize-btn">─</button>
-            <button class="title-bar-btn" id="maximize-btn">□</button>
-            <button class="title-bar-btn close" id="close-btn">×</button>
+            <button class="title-bar-btn" id="minimize-btn" title="Fenster minimieren">─</button>
+            <button class="title-bar-btn" id="tray-btn" title="In Systemleiste minimieren">⬇</button>
+            <button class="title-bar-btn" id="maximize-btn" title="Fenster maximieren">□</button>
+            <button class="title-bar-btn close" id="close-btn" title="In Systemleiste minimieren">×</button>
         </div>
     </div>
 
@@ -25,19 +26,19 @@
     <div class="main-container">
         <!-- Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-item active" data-tab="system">
+            <div class="sidebar-item active" data-tab="system" title="CPU, RAM, Festplatten, Prozesse und Netzwerk-Informationen in Echtzeit">
                 <i class="icon">📊</i>
                 <span>System-Info</span>
             </div>
-            <div class="sidebar-item" data-tab="actions">
+            <div class="sidebar-item" data-tab="actions" title="Updates installieren, Software suchen, Dienste verwalten und Sicherheits-Features">
                 <i class="icon">⚡</i>
                 <span>Schnellaktionen</span>
             </div>
-            <div class="sidebar-item" data-tab="learn">
+            <div class="sidebar-item" data-tab="learn" title="Linux-Befehle lernen, Tipps für Einsteiger und nützliche Tutorials">
                 <i class="icon">📚</i>
                 <span>Lernbereich</span>
             </div>
-            <div class="sidebar-item" data-tab="terminal">
+            <div class="sidebar-item" data-tab="terminal" title="Integriertes Terminal zum Ausführen von Linux-Befehlen direkt in der App">
                 <i class="icon">💻</i>
                 <span>Terminal</span>
             </div>
@@ -63,28 +64,28 @@
                 
                 <!-- Quick Stats Overview -->
                 <div class="quick-stats">
-                    <div class="stat-item">
+                    <div class="stat-item" title="Zeigt aktuelle CPU-Auslastung. Werte über 80% können zu Verlangsamungen führen">
                         <div class="stat-icon">🖥️</div>
                         <div class="stat-content">
                             <div class="stat-value" id="cpu-usage-quick">0%</div>
                             <div class="stat-label">CPU</div>
                         </div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" title="Zeigt RAM-Speicher-Nutzung. Bei über 90% wird das System langsamer">
                         <div class="stat-icon">🧠</div>
                         <div class="stat-content">
                             <div class="stat-value" id="ram-usage-quick">0%</div>
                             <div class="stat-label">RAM</div>
                         </div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" title="Zeigt belegten Festplatten-Speicher. Bei über 95% können Probleme auftreten">
                         <div class="stat-icon">💾</div>
                         <div class="stat-content">
                             <div class="stat-value" id="disk-usage-quick">0%</div>
                             <div class="stat-label">Speicher</div>
                         </div>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" title="Zeigt wie lange das System bereits läuft. Längere Uptime bedeutet Stabilität">
                         <div class="stat-icon">⏱️</div>
                         <div class="stat-content">
                             <div class="stat-value" id="uptime-quick">0</div>
@@ -269,8 +270,8 @@
                         <h3>🔄 System-Updates</h3>
                         <div class="update-status">
                             <div class="update-count" id="update-count">0 Updates verfügbar</div>
-                            <button class="btn primary" id="check-updates">Updates prüfen</button>
-                            <button class="btn secondary" id="install-updates">Updates installieren</button>
+                            <button class="btn primary" id="check-updates" title="Überprüft verfügbare System-Updates von den Paket-Repositories">Updates prüfen</button>
+                            <button class="btn secondary" id="install-updates" title="Installiert alle verfügbaren Updates. Dies kann einige Minuten dauern">Updates installieren</button>
                         </div>
                         <div class="update-list" id="update-list">
                             <!-- Update list will be populated here -->
@@ -282,8 +283,8 @@
                         <h3>📦 Software installieren</h3>
                         <div class="package-search">
                             <div class="search-input-container">
-                                <input type="text" id="package-search" placeholder="Software suchen (z.B. Chrome, Brave, Firefox)...">
-                                <button class="btn secondary" id="search-packages">Suchen</button>
+                                <input type="text" id="package-search" placeholder="Software suchen (z.B. Chrome, Brave, Firefox)..." title="Gib den Namen der Software ein, die du installieren möchtest. Funktioniert mit offiziellen Repos und AUR">
+                                <button class="btn secondary" id="search-packages" title="Startet die Suche nach Software in den Paket-Repositories. Zeigt installierbare Pakete an">Suchen</button>
                             </div>
                             <div class="package-suggestions" id="package-suggestions" style="display: none;">
                                 <!-- Suggestions will be populated here -->
@@ -305,7 +306,7 @@
                         <h3>🛡️ Firewall</h3>
                         <div class="firewall-status">
                             <div class="status-indicator" id="firewall-status">Unbekannt</div>
-                            <button class="btn secondary" id="toggle-firewall">Firewall umschalten</button>
+                            <button class="btn secondary" id="toggle-firewall" title="Aktiviert oder deaktiviert die UFW-Firewall zum Schutz vor unerwünschten Netzwerkzugriffen">Firewall umschalten</button>
                         </div>
                     </div>
                 </div>
@@ -351,17 +352,79 @@
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn primary" id="security-scan">Sicherheitsscan starten</button>
+                            <button class="btn primary" id="security-scan" title="Führt einen umfassenden Sicherheitsscan durch (SSH, Fail2Ban, offene Ports)">Sicherheitsscan starten</button>
                         </div>
 
                         <!-- Security Actions -->
                         <div class="card security-actions">
-                            <h4>⚡ Sicherheits-Aktionen</h4>
-                            <div class="security-buttons">
-                                <button class="btn secondary" id="check-updates-security">🔄 Sicherheitsupdates prüfen</button>
-                                <button class="btn secondary" id="audit-packages">📦 Paket-Audit</button>
-                                <button class="btn secondary" id="check-rootkits">🕵️ Rootkit-Scan</button>
-                                <button class="btn secondary" id="network-scan">🌐 Netzwerk scannen</button>
+                            <h4>⚡ Sicherheits-Aktionen für Einsteiger</h4>
+                            <div class="security-action-cards">
+                                <div class="security-action-card" data-action="check-updates-security">
+                                    <div class="action-icon safety">🔄</div>
+                                    <div class="action-content">
+                                        <div class="action-title">Sicherheitsupdates prüfen</div>
+                                        <div class="action-description">Überprüft verfügbare Sicherheits-Patches</div>
+                                        <div class="action-level beginner">Einfach</div>
+                                    </div>
+                                    <div class="action-status" id="security-updates-status">Nicht geprüft</div>
+                                </div>
+                                
+                                <div class="security-action-card" data-action="audit-packages">
+                                    <div class="action-icon intermediate">📦</div>
+                                    <div class="action-content">
+                                        <div class="action-title">Paket-Sicherheit prüfen</div>
+                                        <div class="action-description">Scannt installierte Programme auf Schwachstellen</div>
+                                        <div class="action-level intermediate">Mittel</div>
+                                    </div>
+                                    <div class="action-status" id="package-audit-status">Nicht geprüft</div>
+                                </div>
+                                
+                                <div class="security-action-card" data-action="check-rootkits">
+                                    <div class="action-icon advanced">🕵️</div>
+                                    <div class="action-content">
+                                        <div class="action-title">Schadprogramm-Scan</div>
+                                        <div class="action-description">Sucht nach Rootkits und Malware</div>
+                                        <div class="action-level advanced">Erweitert</div>
+                                    </div>
+                                    <div class="action-status" id="rootkit-status">Nicht geprüft</div>
+                                </div>
+                                
+                                <div class="security-action-card" data-action="network-scan">
+                                    <div class="action-icon intermediate">🌐</div>
+                                    <div class="action-content">
+                                        <div class="action-title">Netzwerk-Sicherheit</div>
+                                        <div class="action-description">Analysiert offene Verbindungen und Ports</div>
+                                        <div class="action-level intermediate">Mittel</div>
+                                    </div>
+                                    <div class="action-status" id="network-scan-status">Nicht geprüft</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Action Buttons -->
+                            <div class="security-quick-actions">
+                                <button class="btn primary security-all-btn" id="run-all-security-checks">
+                                    🛡️ Alle Sicherheitschecks ausführen
+                                </button>
+                                <div class="security-progress" id="security-progress" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="security-progress-fill"></div>
+                                    </div>
+                                    <div class="progress-text" id="security-progress-text">Starte Sicherheitschecks...</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Security Summary Results -->
+                            <div class="security-summary" id="security-summary" style="display: none;">
+                                <div class="summary-header">
+                                    <h4>📊 Sicherheits-Auswertung</h4>
+                                    <div class="summary-score" id="security-score">0/100</div>
+                                </div>
+                                <div class="summary-content" id="summary-content">
+                                    <!-- Results will be populated here -->
+                                </div>
+                                <div class="summary-recommendations" id="summary-recommendations">
+                                    <!-- Recommendations will be populated here -->
+                                </div>
                             </div>
                         </div>
 
@@ -462,8 +525,8 @@
                 <div class="tab-header">
                     <h2>💻 Terminal-Simulator</h2>
                     <div class="terminal-controls">
-                        <button class="btn small" id="clear-terminal">Löschen</button>
-                        <button class="btn small" id="new-terminal">Neues Terminal</button>
+                        <button class="btn small" id="clear-terminal" title="Löscht alle Ausgaben im Terminal-Fenster">Löschen</button>
+                        <button class="btn small" id="new-terminal" title="Startet eine neue Terminal-Session">Neues Terminal</button>
                     </div>
                 </div>
                 

@@ -1504,25 +1504,294 @@ canvas {
     color: #dc3545;
 }
 
-.security-buttons {
+/* Enhanced Security Action Cards - Sleeker Design */
+.security-action-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px;
-    margin-bottom: 15px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
 }
 
-.security-buttons .btn {
+.security-action-card {
+    background: linear-gradient(135deg, #252526 0%, #2d2d30 100%);
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 64px;
+}
+
+.security-action-card:hover {
+    transform: translateY(-3px);
+    border-color: #007acc;
+    box-shadow: 0 8px 25px rgba(0, 122, 204, 0.2);
+}
+
+.security-action-card.active {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #1a3d1a 0%, #2a4d2a 100%);
+}
+
+.security-action-card.running {
+    border-color: #ffc107;
+    background: linear-gradient(135deg, #3d3d1a 0%, #4d4d2a 100%);
+    animation: pulse-security 2s infinite;
+}
+
+.security-action-card.error {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #3d1a1a 0%, #4d2a2a 100%);
+}
+
+@keyframes pulse-security {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.action-icon {
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.action-icon.safety {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.action-icon.intermediate {
+    background: linear-gradient(135deg, #007acc, #17a2b8);
+    color: white;
+}
+
+.action-icon.advanced {
+    background: linear-gradient(135deg, #6f42c1, #e83e8c);
+    color: white;
+}
+
+.action-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.action-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 2px;
+    line-height: 1.2;
+}
+
+.action-description {
+    font-size: 11px;
+    color: #969696;
+    line-height: 1.3;
+    margin-bottom: 4px;
+}
+
+.action-level {
+    font-size: 9px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    display: inline-block;
+}
+
+.action-level.beginner {
+    background: #28a745;
+    color: white;
+}
+
+.action-level.intermediate {
+    background: #007acc;
+    color: white;
+}
+
+.action-level.advanced {
+    background: #6f42c1;
+    color: white;
+}
+
+.action-status {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #3e3e42;
+    color: #cccccc;
+    font-weight: 500;
+}
+
+.action-status.success {
+    background: #28a745;
+    color: white;
+}
+
+.action-status.running {
+    background: #ffc107;
+    color: #333;
+}
+
+.action-status.error {
+    background: #dc3545;
+    color: white;
+}
+
+/* Security Quick Actions */
+.security-quick-actions {
+    border-top: 1px solid #444;
+    padding-top: 15px;
+    text-align: center;
+}
+
+.security-all-btn {
+    font-size: 16px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border-radius: 10px;
+    min-width: 250px;
+}
+
+.security-progress {
+    margin-top: 15px;
     text-align: left;
+}
+
+.progress-bar {
+    background: #333;
+    border-radius: 8px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 8px;
+}
+
+.progress-text {
+    font-size: 13px;
+    color: #b3b3b3;
+    text-align: center;
+}
+
+/* Security Summary Results */
+.security-summary {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #1e1e1e 0%, #252526 100%);
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.summary-header h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #cccccc;
+    margin: 0;
+}
+
+.summary-score {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 12px;
+    color: white;
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.summary-score.medium {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: #333;
+}
+
+.summary-score.low {
+    background: linear-gradient(135deg, #dc3545, #e83e8c);
+}
+
+.summary-content {
+    margin-bottom: 12px;
+}
+
+.summary-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px;
-    transition: all 0.3s ease;
+    padding: 6px 0;
+    border-bottom: 1px solid #2d2d30;
 }
 
-.security-buttons .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 122, 204, 0.3);
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-icon {
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
+}
+
+.summary-icon.success { color: #28a745; }
+.summary-icon.warning { color: #ffc107; }
+.summary-icon.error { color: #dc3545; }
+
+.summary-text {
+    flex: 1;
+    font-size: 12px;
+    color: #cccccc;
+}
+
+.summary-recommendations {
+    padding-top: 12px;
+    border-top: 1px solid #3e3e42;
+}
+
+.recommendation-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 11px;
+    color: #b3b3b3;
+    line-height: 1.4;
+}
+
+.recommendation-icon {
+    font-size: 12px;
+    color: #007acc;
+    margin-top: 2px;
+}
+
+/* Legacy buttons for compatibility */
+.security-buttons {
+    display: none; /* Hide old button layout */
 }
 
 .security-events {

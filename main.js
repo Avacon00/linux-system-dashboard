@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const si = require('systeminformation');
 const { exec } = require('child_process');
@@ -14,6 +14,7 @@ try {
 
 let mainWindow;
 let autoUpdater;
+let tray = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -42,12 +43,29 @@ function createWindow() {
         autoUpdater = new AutoUpdater(mainWindow);
         autoUpdater.checkForUpdatesOnStartup();
         autoUpdater.startPeriodicUpdateCheck();
-        console.log('Auto-Updater erfolgreich initialisiert');
       } catch (error) {
-        console.log('Auto-Updater konnte nicht initialisiert werden:', error.message);
       }
     } else {
-      console.log('Auto-Updater übersprungen (lokaler Test)');
+    }
+  });
+
+  // Window close Event - Minimize to Tray statt schließen
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      
+      // Notification beim ersten Mal
+      if (!mainWindow.hasShownTrayNotification) {
+        // Tray Notification (falls unterstützt)
+        if (tray) {
+          tray.displayBalloon({
+            title: 'Linux System Dashboard',
+            content: 'App läuft im Hintergrund weiter. Rechtsklick auf das Icon für Optionen.'
+          });
+        }
+        mainWindow.hasShownTrayNotification = true;
+      }
     }
   });
 
@@ -57,12 +75,128 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+// System Tray erstellen
+function createTray() {
+  // Tray Icon laden
+  const iconPath = path.join(__dirname, 'assets/icon.png');
+  let trayIcon;
+  
+  try {
+    trayIcon = nativeImage.createFromPath(iconPath);
+    trayIcon = trayIcon.resize({ width: 16, height: 16 });
+  } catch (error) {
+    trayIcon = nativeImage.createEmpty();
+  }
+  
+  tray = new Tray(trayIcon);
+  
+  // Tray Tooltip mit Live System Stats
+  updateTrayTooltip();
+  
+  // Kontext Menü
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '📊 Dashboard öffnen',
+      click: () => {
+        showWindow();
+      }
+    },
+    {
+      label: '🔄 System aktualisieren',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.send('refresh-system');
+        }
+      }
+    },
+    {
+      label: '⚡ Schnellaktionen',
+      click: () => {
+        showWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('switch-to-actions');
+        }
+      }
+    },
+    {
+      label: '🔒 Sicherheitsscan',
+      click: () => {
+        showWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('start-security-scan');
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '❌ Beenden',
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+  
+  tray.setContextMenu(contextMenu);
+  
+  // Klick auf Tray Icon
+  tray.on('click', () => {
+    showWindow();
+  });
+  
+  // Tooltip alle 5 Sekunden aktualisieren
+  setInterval(updateTrayTooltip, 5000);
+}
+
+// Fenster anzeigen
+function showWindow() {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.show();
+    mainWindow.focus();
+  }
+}
+
+// Tray Tooltip mit Live System Stats aktualisieren
+async function updateTrayTooltip() {
+  if (!tray) return;
+  
+  try {
+    const systemInfo = await si.currentLoad();
+    const memInfo = await si.mem();
+    const osInfo = await si.osInfo();
+    
+    const cpuUsage = Math.round(systemInfo.currentLoad);
+    const ramUsage = Math.round((memInfo.used / memInfo.total) * 100);
+    const uptime = Math.round(osInfo.uptime / 3600); // Stunden
+    
+    const tooltipText = `Linux System Dashboard
+CPU: ${cpuUsage}% | RAM: ${ramUsage}%
+Uptime: ${uptime}h | Klick zum Öffnen`;
+    
+    tray.setToolTip(tooltipText);
+  } catch (error) {
+    tray.setToolTip('Linux System Dashboard\nKlick zum Öffnen');
+  }
+}
+
+app.whenReady().then(() => {
+  createWindow();
+  createTray();
+});
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  // Unter Linux nicht beenden, sondern im Tray laufen lassen
+  if (process.platform === 'darwin') {
     app.quit();
   }
+  // Unter Linux: App läuft im Tray weiter
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
 });
 
 app.on('activate', () => {
@@ -654,51 +788,6 @@ ipcMain.handle('install-package-with-progress', async (event, packageName, sourc
   });
 });
 
-// Legacy IPC Handler für Software-Installation (für Rückwärtskompatibilität)
-ipcMain.handle('install-package', async (_, packageName, source = 'official') => {
-  // Validierung des Paketnamens
-  if (!packageName || typeof packageName !== 'string') {
-    return { success: false, error: 'Ungültiger Paketname' };
-  }
-  
-  // Entferne gefährliche Zeichen
-  const sanitizedPackageName = packageName.replace(/[^a-zA-Z0-9\-_\.]/g, '');
-  if (sanitizedPackageName !== packageName) {
-    return { success: false, error: 'Paketname enthält ungültige Zeichen' };
-  }
-  
-  return new Promise((resolve) => {
-    let command;
-    if (source === 'aur') {
-      // Prüfe ob yay verfügbar ist
-      exec('which yay', (yayCheckError) => {
-        if (yayCheckError) {
-          resolve({ success: false, error: 'yay ist nicht installiert. AUR-Pakete können nicht installiert werden.' });
-        } else {
-          command = `yay -S --noconfirm ${sanitizedPackageName}`;
-          exec(command, { timeout: 300000 }, (error, stdout, stderr) => {
-            if (error) {
-              resolve({ success: false, error: error.message, details: stderr });
-            } else {
-              resolve({ success: true, output: stdout });
-            }
-          });
-        }
-      });
-    } else {
-      // Offizielle Pakete mit pacman
-      command = `sudo pacman -S --noconfirm ${sanitizedPackageName}`;
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          resolve({ success: false, error: error.message, details: stderr });
-        } else {
-          resolve({ success: true, output: stdout });
-        }
-      });
-    }
-  });
-});
-
 // IPC Handler für System-Updates Installation mit Fortschrittsverfolgung
 ipcMain.handle('install-updates', async () => {
   return new Promise((resolve) => {
@@ -716,7 +805,6 @@ ipcMain.handle('install-updates', async () => {
       // Lock-Datei prüfen und entfernen falls vorhanden
       exec('sudo rm -f /var/lib/pacman/db.lck', (lockError) => {
         if (lockError) {
-          console.log('Lock-Datei konnte nicht entfernt werden:', lockError);
         }
 
         // Updates installieren mit detaillierter Ausgabe
@@ -749,11 +837,9 @@ ipcMain.handle('install-updates', async () => {
 
         // Fortschritt verfolgen (falls möglich)
         child.stdout.on('data', (data) => {
-          console.log('Update Progress:', data.toString());
         });
 
         child.stderr.on('data', (data) => {
-          console.log('Update Error:', data.toString());
         });
       });
     });
@@ -813,7 +899,6 @@ ipcMain.handle('get-firewall-status', async () => {
         isActive = stdout.includes('Status: active');
       }
       
-      console.log(`UFW Status Check: ${isActive ? 'active' : 'inactive'}`);
       resolve({ active: isActive });
     });
   });
@@ -830,7 +915,6 @@ ipcMain.handle('toggle-firewall', async () => {
         isActive = statusStdout.includes('Status: active');
       }
       
-      console.log(`Current UFW Status: ${isActive ? 'active' : 'inactive'}`);
       
       // Finde verfügbaren Terminal für sudo-Eingabe
       const terminals = ['konsole', 'alacritty', 'xterm', 'gnome-terminal', 'xfce4-terminal'];
@@ -1112,6 +1196,20 @@ ipcMain.handle('maximize-window', () => {
 
 ipcMain.handle('close-window', () => {
   mainWindow.close();
+});
+
+// Tray IPC Handlers
+ipcMain.handle('minimize-to-tray', () => {
+  if (mainWindow) {
+    mainWindow.hide();
+  }
+});
+
+ipcMain.handle('show-from-tray', () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
 });
 
 // Security-related IPC Handlers
