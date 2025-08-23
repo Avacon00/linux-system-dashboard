@@ -1,6 +1,6 @@
 {
   "name": "linux-system-dashboard",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Ein modernes System-Dashboard für Linux Arch mit praktischen Features und Lernmöglichkeiten",
   "main": "main.js",
   "scripts": {

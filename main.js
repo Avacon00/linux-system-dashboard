@@ -1,8 +1,10 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require('electron');
 const path = require('path');
+const os = require('os');
 const si = require('systeminformation');
 const { exec } = require('child_process');
 const fs = require('fs');
+const sudo = require('sudo-prompt');
 // Auto-Updater - robust laden
 let AutoUpdater;
 try {
@@ -849,9 +851,14 @@ ipcMain.handle('install-updates', async () => {
 // IPC Handler für System-Neustart
 ipcMain.handle('reboot-system', async () => {
   return new Promise((resolve) => {
-    exec('sudo reboot', (error) => {
+    const options = {
+      name: 'Linux System Dashboard',
+      icns: path.join(__dirname, 'assets/icon.png')
+    };
+    
+    sudo.exec('reboot', options, (error) => {
       if (error) {
-        resolve({ success: false, error: error.message });
+        resolve({ success: false, error: 'Neustart abgebrochen oder Passwort falsch' });
       } else {
         resolve({ success: true, message: 'System wird neu gestartet...' });
       }
@@ -1514,6 +1521,247 @@ const ALLOWED_COMMANDS = {
   'mkfs': { safe: false, description: 'Dateisystem erstellen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
   'dd': { safe: false, description: 'Daten kopieren - nicht erlaubt', danger: 'DATENLÖSCHUNG' }
 };
+
+// Export System Report Handler
+ipcMain.handle('export-system-report', async (_, format, data) => {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/T/, '_').slice(0, -5);
+    const filename = `system-report-${timestamp}.${format.toLowerCase()}`;
+    const filepath = path.join(os.homedir(), 'Downloads', filename);
+    
+    let content = '';
+    
+    switch (format.toLowerCase()) {
+      case 'json':
+        content = JSON.stringify(data, null, 2);
+        break;
+        
+      case 'txt':
+        content = generateTextReport(data);
+        break;
+        
+      case 'html':
+        content = generateHtmlReport(data);
+        break;
+        
+      default:
+        throw new Error('Unsupported format');
+    }
+    
+    fs.writeFileSync(filepath, content, 'utf8');
+    
+    return {
+      success: true,
+      message: `Report erfolgreich gespeichert: ${filename}`,
+      filepath: filepath
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      message: `Export fehlgeschlagen: ${error.message}`
+    };
+  }
+});
+
+function generateTextReport(data) {
+  let report = `LINUX SYSTEM DASHBOARD - SYSTEM REPORT\n`;
+  report += `${'='.repeat(50)}\n`;
+  report += `Erstellt am: ${new Date().toLocaleString('de-DE')}\n\n`;
+  
+  // System Info
+  if (data.system) {
+    report += `SYSTEM INFORMATION\n`;
+    report += `${'-'.repeat(20)}\n`;
+    report += `Betriebssystem: ${data.system.os || 'N/A'}\n`;
+    report += `Kernel: ${data.system.kernel || 'N/A'}\n`;
+    report += `Architektur: ${data.system.arch || 'N/A'}\n`;
+    report += `Hostname: ${data.system.hostname || 'N/A'}\n`;
+    report += `Uptime: ${data.system.uptime || 'N/A'}\n\n`;
+  }
+  
+  // CPU Info
+  if (data.cpu) {
+    report += `CPU INFORMATION\n`;
+    report += `${'-'.repeat(15)}\n`;
+    report += `CPU: ${data.cpu.model || 'N/A'}\n`;
+    report += `Kerne: ${data.cpu.cores || 'N/A'}\n`;
+    report += `Auslastung: ${data.cpu.usage || 'N/A'}%\n`;
+    report += `Temperatur: ${data.cpu.temperature || 'N/A'}°C\n\n`;
+  }
+  
+  // Memory Info
+  if (data.memory) {
+    report += `SPEICHER INFORMATION\n`;
+    report += `${'-'.repeat(20)}\n`;
+    report += `Total: ${formatBytes(data.memory.total || 0)}\n`;
+    report += `Verwendet: ${formatBytes(data.memory.used || 0)}\n`;
+    report += `Verfügbar: ${formatBytes(data.memory.available || 0)}\n`;
+    report += `Auslastung: ${data.memory.usage || 'N/A'}%\n\n`;
+  }
+  
+  // Disk Info
+  if (data.disk) {
+    report += `FESTPLATTEN INFORMATION\n`;
+    report += `${'-'.repeat(25)}\n`;
+    report += `Größe: ${formatBytes(data.disk.total || 0)}\n`;
+    report += `Verwendet: ${formatBytes(data.disk.used || 0)}\n`;
+    report += `Verfügbar: ${formatBytes(data.disk.available || 0)}\n`;
+    report += `Auslastung: ${data.disk.usage || 'N/A'}%\n\n`;
+  }
+  
+  // Network Info
+  if (data.network && data.network.length > 0) {
+    report += `NETZWERK INFORMATION\n`;
+    report += `${'-'.repeat(20)}\n`;
+    data.network.forEach(interface => {
+      report += `Interface: ${interface.iface || 'N/A'}\n`;
+      report += `  IP4: ${interface.ip4 || 'N/A'}\n`;
+      report += `  Speed: ${interface.speed || 'N/A'} Mbps\n`;
+      report += `  Status: ${interface.operstate || 'N/A'}\n`;
+    });
+    report += '\n';
+  }
+  
+  // Top Processes
+  if (data.processes && data.processes.length > 0) {
+    report += `TOP PROZESSE (CPU)\n`;
+    report += `${'-'.repeat(18)}\n`;
+    data.processes.slice(0, 10).forEach((proc, index) => {
+      report += `${index + 1}. ${proc.name || 'N/A'} - ${proc.cpu || 0}% CPU, ${formatBytes(proc.memory || 0)} RAM\n`;
+    });
+  }
+  
+  return report;
+}
+
+function generateHtmlReport(data) {
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux System Dashboard - Report</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #1e1e1e; color: #cccccc; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #4ec9b0; margin-bottom: 10px; }
+        .timestamp { color: #888; }
+        .section { background: #2d2d30; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #3e3e42; }
+        .section h2 { color: #569cd6; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #252526; padding: 15px; border-radius: 6px; border: 1px solid #404040; }
+        .card h3 { color: #4ec9b0; margin-top: 0; }
+        .metric { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .metric-label { color: #cccccc; }
+        .metric-value { color: #dcdcaa; font-weight: bold; }
+        .process-list { max-height: 300px; overflow-y: auto; }
+        .process-item { padding: 8px; border-bottom: 1px solid #404040; }
+        .process-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Linux System Dashboard - System Report</h1>
+            <div class="timestamp">Erstellt am: ${new Date().toLocaleString('de-DE')}</div>
+        </div>
+        
+        <div class="grid">
+            ${data.system ? `
+            <div class="card">
+                <h3>📊 System Information</h3>
+                <div class="metric"><span class="metric-label">Betriebssystem:</span> <span class="metric-value">${data.system.os || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Kernel:</span> <span class="metric-value">${data.system.kernel || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Architektur:</span> <span class="metric-value">${data.system.arch || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Hostname:</span> <span class="metric-value">${data.system.hostname || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Uptime:</span> <span class="metric-value">${data.system.uptime || 'N/A'}</span></div>
+            </div>
+            ` : ''}
+            
+            ${data.cpu ? `
+            <div class="card">
+                <h3>🖥️ CPU Information</h3>
+                <div class="metric"><span class="metric-label">CPU:</span> <span class="metric-value">${data.cpu.model || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Kerne:</span> <span class="metric-value">${data.cpu.cores || 'N/A'}</span></div>
+                <div class="metric"><span class="metric-label">Auslastung:</span> <span class="metric-value">${data.cpu.usage || 'N/A'}%</span></div>
+                <div class="metric"><span class="metric-label">Temperatur:</span> <span class="metric-value">${data.cpu.temperature || 'N/A'}°C</span></div>
+            </div>
+            ` : ''}
+            
+            ${data.memory ? `
+            <div class="card">
+                <h3>🧠 Speicher Information</h3>
+                <div class="metric"><span class="metric-label">Total:</span> <span class="metric-value">${formatBytes(data.memory.total || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Verwendet:</span> <span class="metric-value">${formatBytes(data.memory.used || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Verfügbar:</span> <span class="metric-value">${formatBytes(data.memory.available || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Auslastung:</span> <span class="metric-value">${data.memory.usage || 'N/A'}%</span></div>
+            </div>
+            ` : ''}
+            
+            ${data.disk ? `
+            <div class="card">
+                <h3>💾 Festplatten Information</h3>
+                <div class="metric"><span class="metric-label">Größe:</span> <span class="metric-value">${formatBytes(data.disk.total || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Verwendet:</span> <span class="metric-value">${formatBytes(data.disk.used || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Verfügbar:</span> <span class="metric-value">${formatBytes(data.disk.available || 0)}</span></div>
+                <div class="metric"><span class="metric-label">Auslastung:</span> <span class="metric-value">${data.disk.usage || 'N/A'}%</span></div>
+            </div>
+            ` : ''}
+        </div>
+        
+        ${data.processes && data.processes.length > 0 ? `
+        <div class="section">
+            <h2>🔄 Top Prozesse (CPU)</h2>
+            <div class="process-list">
+                ${data.processes.slice(0, 15).map((proc, index) => `
+                <div class="process-item">
+                    <strong>${index + 1}. ${proc.name || 'N/A'}</strong><br>
+                    CPU: ${proc.cpu || 0}% | RAM: ${formatBytes(proc.memory || 0)} | PID: ${proc.pid || 'N/A'}
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
+        ${data.network && data.network.length > 0 ? `
+        <div class="section">
+            <h2>🌐 Netzwerk Interfaces</h2>
+            <div class="grid">
+                ${data.network.map(interface => `
+                <div class="card">
+                    <h3>${interface.iface || 'N/A'}</h3>
+                    <div class="metric"><span class="metric-label">IP4:</span> <span class="metric-value">${interface.ip4 || 'N/A'}</span></div>
+                    <div class="metric"><span class="metric-label">Speed:</span> <span class="metric-value">${interface.speed || 'N/A'} Mbps</span></div>
+                    <div class="metric"><span class="metric-label">Status:</span> <span class="metric-value">${interface.operstate || 'N/A'}</span></div>
+                </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+    </div>
+</body>
+</html>`;
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Open File Handler
+ipcMain.handle('open-file', async (_, filepath) => {
+  try {
+    await shell.openPath(filepath);
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
 
 // Terminal-Backend IPC Handler
 ipcMain.handle('execute-terminal-command', async (event, commandString) => {

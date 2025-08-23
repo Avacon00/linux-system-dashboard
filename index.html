@@ -6,6 +6,7 @@
     <title>Linux System Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="translations.js"></script>
 </head>
 <body>
     <!-- Title Bar -->
@@ -26,21 +27,31 @@
     <div class="main-container">
         <!-- Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-item active" data-tab="system" title="CPU, RAM, Festplatten, Prozesse und Netzwerk-Informationen in Echtzeit">
-                <i class="icon">📊</i>
-                <span>System-Info</span>
+            <div class="sidebar-navigation">
+                <div class="sidebar-item active" data-tab="system" data-tooltip="systemInfoTooltip">
+                    <i class="icon">📊</i>
+                    <span data-translate="systemInfo">System-Info</span>
+                </div>
+                <div class="sidebar-item" data-tab="actions" data-tooltip="quickActionsTooltip">
+                    <i class="icon">⚡</i>
+                    <span data-translate="quickActions">Schnellaktionen</span>
+                </div>
+                <div class="sidebar-item" data-tab="learn" data-tooltip="learningAreaTooltip">
+                    <i class="icon">📚</i>
+                    <span data-translate="learningArea">Lernbereich</span>
+                </div>
+                <div class="sidebar-item" data-tab="terminal" data-tooltip="terminalTooltip">
+                    <i class="icon">💻</i>
+                    <span data-translate="terminal">Terminal</span>
+                </div>
             </div>
-            <div class="sidebar-item" data-tab="actions" title="Updates installieren, Software suchen, Dienste verwalten und Sicherheits-Features">
-                <i class="icon">⚡</i>
-                <span>Schnellaktionen</span>
-            </div>
-            <div class="sidebar-item" data-tab="learn" title="Linux-Befehle lernen, Tipps für Einsteiger und nützliche Tutorials">
-                <i class="icon">📚</i>
-                <span>Lernbereich</span>
-            </div>
-            <div class="sidebar-item" data-tab="terminal" title="Integriertes Terminal zum Ausführen von Linux-Befehlen direkt in der App">
-                <i class="icon">💻</i>
-                <span>Terminal</span>
+            
+            <!-- Language Switcher -->
+            <div class="sidebar-bottom">
+                <div class="language-switcher" id="language-switcher" title="Sprache wechseln / Switch Language">
+                    <img src="assets/language-switcher.svg" alt="Language Switcher" class="language-icon">
+                    <span class="language-label" id="current-language">DE</span>
+                </div>
             </div>
         </div>
 
@@ -49,47 +60,48 @@
             <!-- System Info Tab -->
             <div class="tab-content active" id="system-tab">
                 <div class="tab-header">
-                    <h2>📊 System-Übersicht</h2>
+                    <h2 data-translate="systemOverview">📊 System-Übersicht</h2>
                     <div class="header-controls">
                         <select id="update-speed" class="speed-selector">
-                            <option value="1000">1s (Hoch)</option>
-                            <option value="2000">2s (Normal)</option>
-                            <option value="3000" selected>3s (Empfohlen)</option>
-                            <option value="5000">5s (Sparsam)</option>
-                            <option value="10000">10s (Minimal)</option>
+                            <option value="1000" data-translate="speedHigh">1s (Hoch)</option>
+                            <option value="2000" data-translate="speedNormal">2s (Normal)</option>
+                            <option value="3000" selected data-translate="speedRecommended">3s (Empfohlen)</option>
+                            <option value="5000" data-translate="speedEconomical">5s (Sparsam)</option>
+                            <option value="10000" data-translate="speedMinimal">10s (Minimal)</option>
                         </select>
-                        <div class="refresh-btn" id="refresh-system">🔄 Aktualisieren</div>
+                        <div class="refresh-btn" id="refresh-system" data-translate="refresh">🔄 Aktualisieren</div>
+                        <div class="export-btn" id="export-system-report" data-translate="export">📊 Export</div>
                     </div>
                 </div>
                 
                 <!-- Quick Stats Overview -->
                 <div class="quick-stats">
-                    <div class="stat-item" title="Zeigt aktuelle CPU-Auslastung. Werte über 80% können zu Verlangsamungen führen">
+                    <div class="stat-item" data-tooltip="cpuTooltip">
                         <div class="stat-icon">🖥️</div>
                         <div class="stat-content">
                             <div class="stat-value" id="cpu-usage-quick">0%</div>
-                            <div class="stat-label">CPU</div>
+                            <div class="stat-label" data-translate="cpu">CPU</div>
                         </div>
                     </div>
-                    <div class="stat-item" title="Zeigt RAM-Speicher-Nutzung. Bei über 90% wird das System langsamer">
+                    <div class="stat-item" data-tooltip="ramTooltip">
                         <div class="stat-icon">🧠</div>
                         <div class="stat-content">
                             <div class="stat-value" id="ram-usage-quick">0%</div>
-                            <div class="stat-label">RAM</div>
+                            <div class="stat-label" data-translate="ram">RAM</div>
                         </div>
                     </div>
-                    <div class="stat-item" title="Zeigt belegten Festplatten-Speicher. Bei über 95% können Probleme auftreten">
+                    <div class="stat-item" data-tooltip="storageTooltip">
                         <div class="stat-icon">💾</div>
                         <div class="stat-content">
                             <div class="stat-value" id="disk-usage-quick">0%</div>
-                            <div class="stat-label">Speicher</div>
+                            <div class="stat-label" data-translate="storage">Speicher</div>
                         </div>
                     </div>
-                    <div class="stat-item" title="Zeigt wie lange das System bereits läuft. Längere Uptime bedeutet Stabilität">
+                    <div class="stat-item" data-tooltip="uptimeTooltip">
                         <div class="stat-icon">⏱️</div>
                         <div class="stat-content">
                             <div class="stat-value" id="uptime-quick">0</div>
-                            <div class="stat-label">Laufzeit</div>
+                            <div class="stat-label" data-translate="uptime">Laufzeit</div>
                         </div>
                     </div>
                 </div>
@@ -99,12 +111,12 @@
                     <div class="overview-column">
                         <!-- CPU Card Enhanced -->
                         <div class="card cpu-card">
-                            <h3>🖥️ Prozessor</h3>
+                            <h3 data-translate="cpuInformation">🖥️ Prozessor</h3>
                             <div class="cpu-info-grid">
                                 <div class="cpu-main-info">
                                     <div class="metric">
                                         <div class="metric-value" id="cpu-usage">0%</div>
-                                        <div class="metric-label">Aktuelle Auslastung</div>
+                                        <div class="metric-label" data-translate="cpuUsage">Aktuelle Auslastung</div>
                                     </div>
                                     <div class="cpu-chart-container">
                                         <canvas id="cpu-chart" width="150" height="80"></canvas>
@@ -112,20 +124,20 @@
                                 </div>
                                 <div class="metric-details">
                                     <div class="info-row">
-                                        <span class="info-label">Modell</span>
+                                        <span class="info-label" data-translate="brand">Modell</span>
                                         <span id="cpu-model">-</span>
                                     </div>
                                     <div class="info-row">
-                                        <span class="info-label">Kerne</span>
+                                        <span class="info-label" data-translate="cores">Kerne</span>
                                         <span id="cpu-cores">-</span>
                                     </div>
                                     <div class="info-row">
-                                        <span class="info-label">Taktfrequenz</span>
+                                        <span class="info-label" data-translate="baseSpeed">Taktfrequenz</span>
                                         <span id="cpu-speed">-</span>
                                     </div>
                                 </div>
                                 <div class="cpu-cores-container">
-                                    <h4>CPU-Kerne im Detail:</h4>
+                                    <h4 data-translate="cpuCoresDetail">CPU-Kerne im Detail:</h4>
                                     <div class="cpu-cores-grid" id="cpu-cores-grid">
                                         <!-- Individual CPU cores will be populated here -->
                                     </div>
@@ -135,22 +147,22 @@
 
                         <!-- System Info Enhanced -->
                         <div class="card system-card">
-                            <h3>ℹ️ System-Information</h3>
+                            <h3 data-translate="systemInformation">ℹ️ System-Information</h3>
                             <div class="system-info">
                                 <div class="info-row">
-                                    <span class="info-label">Betriebssystem</span>
+                                    <span class="info-label" data-translate="operatingSystem">Betriebssystem</span>
                                     <span id="os-distro">-</span>
                                 </div>
                                 <div class="info-row">
-                                    <span class="info-label">Version</span>
+                                    <span class="info-label" data-translate="kernel">Version</span>
                                     <span id="os-release">-</span>
                                 </div>
                                 <div class="info-row">
-                                    <span class="info-label">Hostname</span>
+                                    <span class="info-label" data-translate="hostname">Hostname</span>
                                     <span id="os-hostname">-</span>
                                 </div>
                                 <div class="info-row">
-                                    <span class="info-label">Laufzeit</span>
+                                    <span class="info-label" data-translate="runtime">Laufzeit</span>
                                     <span id="system-uptime">-</span>
                                 </div>
                                 <div class="info-row">
@@ -168,7 +180,7 @@
                     <div class="overview-column">
                         <!-- Memory Card Enhanced -->
                         <div class="card memory-card">
-                            <h3>🧠 Arbeitsspeicher</h3>
+                            <h3 data-translate="memoryInformation">🧠 Arbeitsspeicher</h3>
                             <div class="memory-info-grid">
                                 <div class="memory-stats">
                                     <div class="metric">
@@ -205,7 +217,7 @@
 
                         <!-- Storage Card Enhanced -->
                         <div class="card storage-card">
-                            <h3>💾 Speicher-Geräte</h3>
+                            <h3 data-translate="storageDevices">💾 Speicher-Geräte</h3>
                             <div id="disk-list">
                                 <!-- Disk entries will be populated here -->
                             </div>
@@ -213,7 +225,7 @@
 
                         <!-- Temperature & Sensors Card -->
                         <div class="card temperature-card">
-                            <h4>🌡️ Temperatur & Sensoren</h4>
+                            <h4 data-translate="temperatureAndSensors">🌡️ Temperatur & Sensoren</h4>
                             <div class="temperature-grid" id="temperature-grid">
                                 <div class="temp-item">
                                     <div class="temp-icon">🖥️</div>
@@ -243,7 +255,7 @@
 
                 <!-- Processes -->
                 <div class="card full-width">
-                    <h3>🔄 Laufende Prozesse</h3>
+                    <h3 data-translate="runningProcesses">🔄 Laufende Prozesse</h3>
                     <div class="process-list" id="process-list">
                         <!-- Process entries will be populated here -->
                     </div>
@@ -251,7 +263,7 @@
 
                 <!-- Network -->
                 <div class="card full-width">
-                    <h3>🌐 Netzwerk</h3>
+                    <h3 data-translate="networkInformation">🌐 Netzwerk</h3>
                     <div class="network-info" id="network-info">
                         <!-- Network info will be populated here -->
                     </div>
@@ -261,17 +273,17 @@
             <!-- Quick Actions Tab -->
             <div class="tab-content" id="actions-tab">
                 <div class="tab-header">
-                    <h2>⚡ Schnellaktionen</h2>
+                    <h2 data-translate="quickActionsTitle">⚡ Schnellaktionen</h2>
                 </div>
                 
                 <div class="dashboard-grid">
                     <!-- System Updates -->
                     <div class="card">
-                        <h3>🔄 System-Updates</h3>
+                        <h3 data-translate="systemUpdates">🔄 System-Updates</h3>
                         <div class="update-status">
-                            <div class="update-count" id="update-count">0 Updates verfügbar</div>
-                            <button class="btn primary" id="check-updates" title="Überprüft verfügbare System-Updates von den Paket-Repositories">Updates prüfen</button>
-                            <button class="btn secondary" id="install-updates" title="Installiert alle verfügbaren Updates. Dies kann einige Minuten dauern">Updates installieren</button>
+                            <div class="update-count" id="update-count">0 <span data-translate="updatesAvailable">Updates verfügbar</span></div>
+                            <button class="btn primary" id="check-updates" data-tooltip="checkUpdatesTooltip" data-translate="checkUpdates">Updates prüfen</button>
+                            <button class="btn secondary" id="install-updates" data-tooltip="installUpdatesTooltip" data-translate="installUpdates">Updates installieren</button>
                         </div>
                         <div class="update-list" id="update-list">
                             <!-- Update list will be populated here -->
@@ -280,11 +292,11 @@
 
                     <!-- Software Installation -->
                     <div class="card">
-                        <h3>📦 Software installieren</h3>
+                        <h3 data-translate="softwareInstall">📦 Software installieren</h3>
                         <div class="package-search">
                             <div class="search-input-container">
-                                <input type="text" id="package-search" placeholder="Software suchen (z.B. Chrome, Brave, Firefox)..." title="Gib den Namen der Software ein, die du installieren möchtest. Funktioniert mit offiziellen Repos und AUR">
-                                <button class="btn secondary" id="search-packages" title="Startet die Suche nach Software in den Paket-Repositories. Zeigt installierbare Pakete an">Suchen</button>
+                                <input type="text" id="package-search" data-tooltip="packageSearchTooltip" placeholder="Software suchen (z.B. Chrome, Brave, Firefox)...">
+                                <button class="btn secondary" id="search-packages" data-tooltip="searchPackagesTooltip" data-translate="searchPackages">Suchen</button>
                             </div>
                             <div class="package-suggestions" id="package-suggestions" style="display: none;">
                                 <!-- Suggestions will be populated here -->
@@ -295,7 +307,7 @@
 
                     <!-- Services -->
                     <div class="card">
-                        <h3>🔧 Dienste</h3>
+                        <h3 data-translate="systemServices">🔧 Dienste</h3>
                         <div class="services-list" id="services-list">
                             <!-- Services will be populated here -->
                         </div>
@@ -303,106 +315,106 @@
 
                     <!-- Firewall -->
                     <div class="card">
-                        <h3>🛡️ Firewall</h3>
+                        <h3 data-translate="firewall">🛡️ Firewall</h3>
                         <div class="firewall-status">
-                            <div class="status-indicator" id="firewall-status">Unbekannt</div>
-                            <button class="btn secondary" id="toggle-firewall" title="Aktiviert oder deaktiviert die UFW-Firewall zum Schutz vor unerwünschten Netzwerkzugriffen">Firewall umschalten</button>
+                            <div class="status-indicator" id="firewall-status" data-translate="firewallStatus">Unbekannt</div>
+                            <button class="btn secondary" id="toggle-firewall" data-tooltip="toggleFirewallTooltip" data-translate="toggleFirewall">Firewall umschalten</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Tools -->
                 <div class="card full-width">
-                    <h3>🛠️ Schnellzugriff</h3>
+                    <h3 data-translate="quickTools">🛠️ Schnellzugriff</h3>
                     <div class="quick-tools">
-                        <button class="tool-btn" data-command="gnome-terminal">Terminal öffnen</button>
-                        <button class="tool-btn" data-command="nautilus">Dateimanager öffnen</button>
-                        <button class="tool-btn" data-command="gnome-system-monitor">System-Monitor öffnen</button>
-                        <button class="tool-btn" data-command="gnome-software">Software-Center öffnen</button>
+                        <button class="tool-btn" data-command="gnome-terminal" data-translate="openTerminal">Terminal öffnen</button>
+                        <button class="tool-btn" data-command="nautilus" data-translate="openFileManager">Dateimanager öffnen</button>
+                        <button class="tool-btn" data-command="gnome-system-monitor" data-translate="openSystemMonitor">System-Monitor öffnen</button>
+                        <button class="tool-btn" data-command="gnome-software" data-translate="openSoftwareCenter">Software-Center öffnen</button>
                     </div>
                 </div>
 
                 <!-- Security Features Section -->
                 <div class="card full-width">
-                    <h3>🔒 Sicherheits-Center</h3>
+                    <h3 data-translate="securityCenter">🔒 Sicherheits-Center</h3>
                     <div class="dashboard-grid">
                         <!-- Security Overview -->
                         <div class="card security-overview">
-                            <h4>📊 Sicherheits-Status</h4>
+                            <h4 data-translate="securityStatus">📊 Sicherheits-Status</h4>
                             <div class="security-metrics">
                                 <div class="security-metric">
                                     <div class="metric-icon">🔐</div>
                                     <div class="metric-info">
-                                        <div class="metric-title">SSH-Status</div>
-                                        <div class="metric-value" id="ssh-status">Prüfe...</div>
+                                        <div class="metric-title" data-translate="sshStatus">SSH-Status</div>
+                                        <div class="metric-value" id="ssh-status" data-translate="checking">Prüfe...</div>
                                     </div>
                                 </div>
                                 <div class="security-metric">
                                     <div class="metric-icon">🚫</div>
                                     <div class="metric-info">
-                                        <div class="metric-title">Fail2Ban</div>
-                                        <div class="metric-value" id="fail2ban-status">Prüfe...</div>
+                                        <div class="metric-title" data-translate="fail2banStatus">Fail2Ban</div>
+                                        <div class="metric-value" id="fail2ban-status" data-translate="checking">Prüfe...</div>
                                     </div>
                                 </div>
                                 <div class="security-metric">
                                     <div class="metric-icon">🔍</div>
                                     <div class="metric-info">
-                                        <div class="metric-title">Offene Ports</div>
-                                        <div class="metric-value" id="open-ports">Scanne...</div>
+                                        <div class="metric-title" data-translate="openPorts">Offene Ports</div>
+                                        <div class="metric-value" id="open-ports" data-translate="scanning">Scanne...</div>
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn primary" id="security-scan" title="Führt einen umfassenden Sicherheitsscan durch (SSH, Fail2Ban, offene Ports)">Sicherheitsscan starten</button>
+                            <button class="btn primary" id="security-scan" data-tooltip="securityScanTooltip" data-translate="startSecurityScan">Sicherheitsscan starten</button>
                         </div>
 
                         <!-- Security Actions -->
                         <div class="card security-actions">
-                            <h4>⚡ Sicherheits-Aktionen für Einsteiger</h4>
+                            <h4 data-translate="securityActionsForBeginners">⚡ Sicherheits-Aktionen für Einsteiger</h4>
                             <div class="security-action-cards">
                                 <div class="security-action-card" data-action="check-updates-security">
                                     <div class="action-icon safety">🔄</div>
                                     <div class="action-content">
-                                        <div class="action-title">Sicherheitsupdates prüfen</div>
-                                        <div class="action-description">Überprüft verfügbare Sicherheits-Patches</div>
-                                        <div class="action-level beginner">Einfach</div>
+                                        <div class="action-title" data-translate="checkSecurityUpdates">Sicherheitsupdates prüfen</div>
+                                        <div class="action-description" data-translate="checkSecurityUpdatesDesc">Überprüft verfügbare Sicherheits-Patches</div>
+                                        <div class="action-level beginner" data-translate="easy">Einfach</div>
                                     </div>
-                                    <div class="action-status" id="security-updates-status">Nicht geprüft</div>
+                                    <div class="action-status" id="security-updates-status" data-translate="notChecked">Nicht geprüft</div>
                                 </div>
                                 
                                 <div class="security-action-card" data-action="audit-packages">
                                     <div class="action-icon intermediate">📦</div>
                                     <div class="action-content">
-                                        <div class="action-title">Paket-Sicherheit prüfen</div>
-                                        <div class="action-description">Scannt installierte Programme auf Schwachstellen</div>
-                                        <div class="action-level intermediate">Mittel</div>
+                                        <div class="action-title" data-translate="checkPackageSecurity">Paket-Sicherheit prüfen</div>
+                                        <div class="action-description" data-translate="checkPackageSecurityDesc">Scannt installierte Programme auf Schwachstellen</div>
+                                        <div class="action-level intermediate" data-translate="medium">Mittel</div>
                                     </div>
-                                    <div class="action-status" id="package-audit-status">Nicht geprüft</div>
+                                    <div class="action-status" id="package-audit-status" data-translate="notChecked">Nicht geprüft</div>
                                 </div>
                                 
                                 <div class="security-action-card" data-action="check-rootkits">
                                     <div class="action-icon advanced">🕵️</div>
                                     <div class="action-content">
-                                        <div class="action-title">Schadprogramm-Scan</div>
-                                        <div class="action-description">Sucht nach Rootkits und Malware</div>
-                                        <div class="action-level advanced">Erweitert</div>
+                                        <div class="action-title" data-translate="malwareScan">Schadprogramm-Scan</div>
+                                        <div class="action-description" data-translate="malwareScanDesc">Sucht nach Rootkits und Malware</div>
+                                        <div class="action-level advanced" data-translate="advanced">Erweitert</div>
                                     </div>
-                                    <div class="action-status" id="rootkit-status">Nicht geprüft</div>
+                                    <div class="action-status" id="rootkit-status" data-translate="notChecked">Nicht geprüft</div>
                                 </div>
                                 
                                 <div class="security-action-card" data-action="network-scan">
                                     <div class="action-icon intermediate">🌐</div>
                                     <div class="action-content">
-                                        <div class="action-title">Netzwerk-Sicherheit</div>
-                                        <div class="action-description">Analysiert offene Verbindungen und Ports</div>
-                                        <div class="action-level intermediate">Mittel</div>
+                                        <div class="action-title" data-translate="networkSecurity">Netzwerk-Sicherheit</div>
+                                        <div class="action-description" data-translate="networkSecurityDesc">Analysiert offene Verbindungen und Ports</div>
+                                        <div class="action-level intermediate" data-translate="medium">Mittel</div>
                                     </div>
-                                    <div class="action-status" id="network-scan-status">Nicht geprüft</div>
+                                    <div class="action-status" id="network-scan-status" data-translate="notChecked">Nicht geprüft</div>
                                 </div>
                             </div>
                             
                             <!-- Quick Action Buttons -->
                             <div class="security-quick-actions">
-                                <button class="btn primary security-all-btn" id="run-all-security-checks">
+                                <button class="btn primary security-all-btn" id="run-all-security-checks" data-translate="runAllSecurityChecks">
                                     🛡️ Alle Sicherheitschecks ausführen
                                 </button>
                                 <div class="security-progress" id="security-progress" style="display: none;">
@@ -416,7 +428,7 @@
                             <!-- Security Summary Results -->
                             <div class="security-summary" id="security-summary" style="display: none;">
                                 <div class="summary-header">
-                                    <h4>📊 Sicherheits-Auswertung</h4>
+                                    <h4 data-translate="securityEvaluation">📊 Sicherheits-Auswertung</h4>
                                     <div class="summary-score" id="security-score">0/100</div>
                                 </div>
                                 <div class="summary-content" id="summary-content">
@@ -430,7 +442,7 @@
 
                         <!-- Recent Security Events -->
                         <div class="card security-logs">
-                            <h4>📋 Sicherheits-Ereignisse</h4>
+                            <h4 data-translate="securityEvents">📋 Sicherheits-Ereignisse</h4>
                             <div class="security-events" id="security-events">
                                 <div class="loading-message">Lade Sicherheitsereignisse...</div>
                             </div>
@@ -442,77 +454,77 @@
             <!-- Learning Tab -->
             <div class="tab-content" id="learn-tab">
                 <div class="tab-header">
-                    <h2>📚 Lernbereich</h2>
+                    <h2 data-translate="learningAreaTitle">📚 Lernbereich</h2>
                 </div>
                 
                 <div class="dashboard-grid">
                     <!-- Command of the Day -->
                     <div class="card">
-                        <h3>💡 Befehl des Tages</h3>
+                        <h3 data-translate="commandOfTheDay">💡 Befehl des Tages</h3>
                         <div class="command-of-day">
                             <div class="command" id="todays-command">ls -la</div>
                             <div class="command-explanation" id="command-explanation">
                                 Listet alle Dateien und Verzeichnisse mit Details auf
                             </div>
-                            <button class="btn secondary" id="try-command">Befehl ausprobieren</button>
+                            <button class="btn secondary" id="try-command" data-translate="tryCommand">Befehl ausprobieren</button>
                         </div>
                     </div>
 
                     <!-- Common Problems -->
                     <div class="card">
-                        <h3>🔧 Häufige Probleme</h3>
+                        <h3 data-translate="commonProblems">🔧 Häufige Probleme</h3>
                         <div class="problems-list">
                             <div class="problem-item">
-                                <h4>System wird langsam</h4>
-                                <p>Überprüfen Sie die CPU- und RAM-Auslastung</p>
-                                <button class="btn small">Lösung anzeigen</button>
+                                <h4 data-translate="systemSlow">System wird langsam</h4>
+                                <p data-translate="systemSlowDesc">Überprüfen Sie die CPU- und RAM-Auslastung</p>
+                                <button class="btn small" data-translate="showSolution">Lösung anzeigen</button>
                             </div>
                             <div class="problem-item">
-                                <h4>Netzwerk funktioniert nicht</h4>
-                                <p>Überprüfen Sie die Netzwerkverbindung</p>
-                                <button class="btn small">Lösung anzeigen</button>
+                                <h4 data-translate="networkNotWorking">Netzwerk funktioniert nicht</h4>
+                                <p data-translate="networkNotWorkingDesc">Überprüfen Sie die Netzwerkverbindung</p>
+                                <button class="btn small" data-translate="showSolution">Lösung anzeigen</button>
                             </div>
                             <div class="problem-item">
-                                <h4>Updates fehlgeschlagen</h4>
-                                <p>Überprüfen Sie die Internetverbindung</p>
-                                <button class="btn small">Lösung anzeigen</button>
+                                <h4 data-translate="updatesFailed">Updates fehlgeschlagen</h4>
+                                <p data-translate="updatesFailedDesc">Überprüfen Sie die Internetverbindung</p>
+                                <button class="btn small" data-translate="showSolution">Lösung anzeigen</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Tutorials -->
                     <div class="card">
-                        <h3>📖 Tutorials & Links</h3>
+                        <h3 data-translate="tutorialsAndLinks">📖 Tutorials & Links</h3>
                         <div class="tutorials-list">
                             <a href="https://wiki.archlinux.org/" target="_blank" class="tutorial-link">
-                                📚 Arch Linux Wiki
+                                <span data-translate="archWiki">📚 Arch Linux Wiki</span>
                             </a>
                             <a href="https://www.linux.org/" target="_blank" class="tutorial-link">
-                                🐧 Linux.org Tutorials
+                                <span data-translate="linuxTutorials">🐧 Linux.org Tutorials</span>
                             </a>
                             <a href="https://www.gnu.org/software/bash/manual/" target="_blank" class="tutorial-link">
-                                💻 Bash Handbuch
+                                <span data-translate="bashManual">💻 Bash Handbuch</span>
                             </a>
                             <a href="https://www.ssh.com/ssh/" target="_blank" class="tutorial-link">
-                                🔐 SSH Tutorial
+                                <span data-translate="sshTutorial">🔐 SSH Tutorial</span>
                             </a>
                         </div>
                     </div>
 
                     <!-- Tips -->
                     <div class="card">
-                        <h3>💡 Tipps für Einsteiger</h3>
+                        <h3 data-translate="beginnerTips">💡 Tipps für Einsteiger</h3>
                         <div class="tips-list">
-                            <div class="tip">
+                            <div class="tip" data-translate="openTerminal">
                                 <strong>Terminal öffnen:</strong> Strg+Alt+T
                             </div>
-                            <div class="tip">
+                            <div class="tip" data-translate="openFileManager">
                                 <strong>Dateimanager:</strong> Super+E
                             </div>
-                            <div class="tip">
+                            <div class="tip" data-translate="openApplications">
                                 <strong>Anwendungen:</strong> Super+A
                             </div>
-                            <div class="tip">
+                            <div class="tip" data-translate="regularUpdates">
                                 <strong>System-Updates:</strong> Regelmäßig ausführen
                             </div>
                         </div>
@@ -523,10 +535,10 @@
             <!-- Terminal Tab -->
             <div class="tab-content" id="terminal-tab">
                 <div class="tab-header">
-                    <h2>💻 Terminal-Simulator</h2>
+                    <h2 data-translate="terminalTitle">💻 Terminal-Simulator</h2>
                     <div class="terminal-controls">
-                        <button class="btn small" id="clear-terminal" title="Löscht alle Ausgaben im Terminal-Fenster">Löschen</button>
-                        <button class="btn small" id="new-terminal" title="Startet eine neue Terminal-Session">Neues Terminal</button>
+                        <button class="btn small" id="clear-terminal" data-tooltip="clearTerminalTooltip">🗑️ <span data-translate="clearTerminal">Terminal leeren</span></button>
+                        <button class="btn small" id="new-terminal" data-tooltip="newTerminalTooltip" data-translate="newTerminal">Neues Terminal</button>
                     </div>
                 </div>
                 

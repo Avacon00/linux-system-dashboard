@@ -16,10 +16,19 @@ const tabContents = document.querySelectorAll('.tab-content');
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', () => {
+    initializeLanguage();
     initializeApp();
     setupEventListeners();
     startSystemMonitoring();
 });
+
+// Language-Initialisierung
+function initializeLanguage() {
+    updateLanguageDisplay();
+    updateAllTexts();
+    updateTooltips();
+    updatePlaceholders();
+}
 
 // App-Initialisierung
 function initializeApp() {
@@ -29,6 +38,47 @@ function initializeApp() {
     loadCommandOfDay();
     loadServices();
     loadFirewallStatus();
+}
+
+// Update tooltips based on current language
+function updateTooltips() {
+    document.querySelectorAll('[data-tooltip]').forEach(element => {
+        const key = element.getAttribute('data-tooltip');
+        element.title = t(key);
+    });
+}
+
+// Update placeholders based on current language
+function updatePlaceholders() {
+    const packageSearch = document.getElementById('package-search');
+    if (packageSearch) {
+        packageSearch.placeholder = t('packageSearchPlaceholder');
+    }
+}
+
+// Translate security messages from backend
+function translateSecurityMessage(message) {
+    if (!message) return message;
+    
+    // Map of German security messages to translation keys
+    const messageMap = {
+        'SSH ist deaktiviert': 'sshDisabled',
+        'Fail2Ban ist nicht aktiv': 'fail2banNotActive'
+    };
+    
+    // Check for port messages (e.g. "13 offene Ports gefunden")
+    if (message.includes('offene Ports gefunden')) {
+        const count = message.match(/\d+/)?.[0] || '0';
+        return `${count} ${t('openPortsFound')}`;
+    }
+    
+    // Direct translation mapping
+    if (messageMap[message]) {
+        return t(messageMap[message]);
+    }
+    
+    // Return original message if no translation found
+    return message;
 }
 
 // Event Listeners Setup
@@ -58,9 +108,28 @@ function setupEventListeners() {
         window.electronAPI.minimizeToTray();
     });
 
+    // Language Switcher
+    document.getElementById('language-switcher').addEventListener('click', () => {
+        switchLanguage();
+        updateTooltips(); // Update tooltips after language switch
+        updatePlaceholders(); // Update placeholders after language switch
+        
+        // Reload dynamic content with new language
+        setTimeout(() => {
+            loadSystemInfo(); // Reload system info with translated labels
+            loadServices(); // Reload services with translated labels
+            loadFirewallStatus(); // Reload firewall status with translated labels
+        }, 100);
+    });
+
     // System Refresh
     document.getElementById('refresh-system').addEventListener('click', () => {
         loadSystemInfo();
+    });
+
+    // Export System Report
+    document.getElementById('export-system-report').addEventListener('click', () => {
+        showExportDialog();
     });
 
     // Update Speed Selector
@@ -164,13 +233,13 @@ async function executeSecurityAction(action, cardElement) {
         // Success state
         cardElement.classList.remove('running');
         cardElement.classList.add('active');
-        statusElement.textContent = 'Abgeschlossen';
+        statusElement.textContent = t('completed');
         statusElement.className = 'action-status success';
         
         // Auto-reset after 5 seconds
         setTimeout(() => {
             cardElement.classList.remove('active');
-            statusElement.textContent = 'Geprüft';
+            statusElement.textContent = t('checked');
             statusElement.className = 'action-status';
         }, 5000);
         
@@ -198,10 +267,10 @@ async function runAllSecurityChecks() {
     const actionCards = document.querySelectorAll('.security-action-card');
     
     const actions = [
-        { action: 'check-updates-security', name: 'Sicherheitsupdates' },
-        { action: 'audit-packages', name: 'Paket-Sicherheit' },
-        { action: 'check-rootkits', name: 'Schadprogramm-Scan' },
-        { action: 'network-scan', name: 'Netzwerk-Sicherheit' }
+        { action: 'check-updates-security', name: t('securityUpdatesName') },
+        { action: 'audit-packages', name: t('packageSecurityName') },
+        { action: 'check-rootkits', name: t('malwareScanName') },
+        { action: 'network-scan', name: t('networkSecurityName') }
     ];
     
     const results = [];
@@ -222,9 +291,9 @@ async function runAllSecurityChecks() {
         // Execute action and track results
         try {
             await executeSecurityAction(action, cardElement);
-            results.push({ action, name, status: 'success', message: 'Erfolgreich abgeschlossen' });
+            results.push({ action, name, status: 'success', message: t('successfullyCompleted') });
         } catch (error) {
-            results.push({ action, name, status: 'error', message: error.message || 'Fehler aufgetreten' });
+            results.push({ action, name, status: 'error', message: error.message || t('errorOccurredGeneric') });
         }
         
         // Small delay between actions
@@ -232,7 +301,7 @@ async function runAllSecurityChecks() {
     }
     
     // Complete
-    progressText.textContent = 'Alle Sicherheitschecks abgeschlossen!';
+    progressText.textContent = t('allSecurityChecksCompleted');
     
     // Hide progress bar after 1 second, then show summary
     setTimeout(() => {
@@ -289,13 +358,13 @@ function showSecuritySummary(results) {
     contentElement.innerHTML = contentHTML;
     
     // Generate intelligent recommendations
-    let recommendationsHTML = '<h5 style="color: #007acc; margin: 0 0 8px 0; font-size: 12px;">💡 Empfehlungen für Anfänger:</h5>';
+    let recommendationsHTML = `<h5 style="color: #007acc; margin: 0 0 8px 0; font-size: 12px;">${t('recommendationsForBeginners')}</h5>`;
     
     if (score === 100) {
         recommendationsHTML += `
             <div class="recommendation-item">
                 <div class="recommendation-icon">🎉</div>
-                <div>Perfekt! Alle Sicherheitschecks erfolgreich. Führe diese Prüfungen regelmäßig (wöchentlich) durch.</div>
+                <div>${t('perfectAllChecksSuccessful')}</div>
             </div>
         `;
     } else {
@@ -304,7 +373,7 @@ function showSecuritySummary(results) {
             recommendationsHTML += `
                 <div class="recommendation-item">
                     <div class="recommendation-icon">🔄</div>
-                    <div>Sicherheitsupdates fehlgeschlagen: Überprüfe deine Internetverbindung und starte das System neu.</div>
+                    <div>${t('securityUpdatesFailed')}</div>
                 </div>
             `;
         }
@@ -314,7 +383,7 @@ function showSecuritySummary(results) {
             recommendationsHTML += `
                 <div class="recommendation-item">
                     <div class="recommendation-icon">📦</div>
-                    <div>Paket-Audit fehlgeschlagen: Führe 'sudo pacman -Syu' im Terminal aus, um Pakete zu aktualisieren.</div>
+                    <div>${t('packageAuditFailed')}</div>
                 </div>
             `;
         }
@@ -324,7 +393,7 @@ function showSecuritySummary(results) {
             recommendationsHTML += `
                 <div class="recommendation-item">
                     <div class="recommendation-icon">🕵️</div>
-                    <div>Rootkit-Scan nicht verfügbar: Installiere 'rkhunter' oder 'chkrootkit' für erweiterte Sicherheit.</div>
+                    <div>${t('rootkitScanNotAvailable')}</div>
                 </div>
             `;
         }
@@ -334,7 +403,7 @@ function showSecuritySummary(results) {
             recommendationsHTML += `
                 <div class="recommendation-item">
                     <div class="recommendation-icon">🌐</div>
-                    <div>Netzwerk-Scan fehlgeschlagen: Installiere 'nmap' für detaillierte Port-Analysen.</div>
+                    <div>${t('networkScanFailed')}</div>
                 </div>
             `;
         }
@@ -343,11 +412,11 @@ function showSecuritySummary(results) {
         recommendationsHTML += `
             <div class="recommendation-item">
                 <div class="recommendation-icon">⚡</div>
-                <div>Tipp: Aktiviere die Firewall über "Firewall umschalten" für besseren Schutz.</div>
+                <div>${t('firewallRecommendation')}</div>
             </div>
             <div class="recommendation-item">
                 <div class="recommendation-icon">📅</div>
-                <div>Plane regelmäßige Sicherheitschecks: Wöchentlich oder nach großen System-Updates.</div>
+                <div>${t('regularChecksRecommendation')}</div>
             </div>
         `;
     }
@@ -448,7 +517,7 @@ function updateSystemDisplay() {
     const cpuUsage = isNaN(cpuLoad) ? 0 : Math.round(cpuLoad);
     document.getElementById('cpu-usage').textContent = `${cpuUsage}%`;
     document.getElementById('cpu-model').textContent = systemInfo.cpu.model;
-    document.getElementById('cpu-cores').textContent = `${systemInfo.cpu.cores} Kerne`;
+    document.getElementById('cpu-cores').textContent = `${systemInfo.cpu.cores} ${t('cores')}`;
     document.getElementById('cpu-speed').textContent = `${systemInfo.cpu.speed} GHz`;
 
     // Update Quick Stats
@@ -730,7 +799,7 @@ function updateCpuCoresDisplay() {
             const coreElement = document.createElement('div');
             coreElement.className = 'cpu-core-item';
             coreElement.innerHTML = `
-                <div class="cpu-core-number">Kern ${core.core}</div>
+                <div class="cpu-core-number">${t('cpuCore')} ${core.core}</div>
                 <div class="cpu-core-usage">${core.usage}%</div>
                 <div class="cpu-core-bar">
                     <div class="cpu-core-progress" style="width: ${core.usage}%"></div>
@@ -744,7 +813,7 @@ function updateCpuCoresDisplay() {
             const coreElement = document.createElement('div');
             coreElement.className = 'cpu-core-item';
             coreElement.innerHTML = `
-                <div class="cpu-core-number">Kern ${i + 1}</div>
+                <div class="cpu-core-number">${t('cpuCore')} ${i + 1}</div>
                 <div class="cpu-core-usage">0%</div>
                 <div class="cpu-core-bar">
                     <div class="cpu-core-progress" style="width: 0%"></div>
@@ -1047,7 +1116,7 @@ async function checkUpdates() {
     try {
         const updateButton = document.getElementById('check-updates');
         const originalText = updateButton.textContent;
-        updateButton.textContent = 'Prüfe Updates...';
+        updateButton.textContent = t('checkingUpdates');
         updateButton.disabled = true;
         
         const updates = await window.electronAPI.checkUpdates();
@@ -1059,10 +1128,10 @@ async function checkUpdates() {
             updateCount.textContent = `Fehler: ${updates.error}`;
             updateCount.className = 'update-count error';
         } else if (updates.available > 0) {
-            updateCount.textContent = `${updates.available} Updates verfügbar`;
+            updateCount.textContent = `${updates.available} ${t('updatesAvailable')}`;
             updateCount.className = 'update-count available';
         } else {
-            updateCount.textContent = updates.message || 'Keine Updates verfügbar';
+            updateCount.textContent = updates.message || t('systemIsUpToDate');
             updateCount.className = 'update-count current';
         }
         
@@ -1070,7 +1139,7 @@ async function checkUpdates() {
         if (updates.lastSync) {
             const syncInfo = document.createElement('div');
             syncInfo.className = 'sync-info';
-            syncInfo.textContent = `Letzte Prüfung: ${updates.lastSync}`;
+            syncInfo.textContent = `${t('lastCheck')} ${updates.lastSync}`;
             updateCount.appendChild(syncInfo);
         }
         
@@ -1106,13 +1175,13 @@ async function checkUpdates() {
         } else if (!updates.error) {
             const noUpdatesElement = document.createElement('div');
             noUpdatesElement.className = 'no-updates';
-            noUpdatesElement.textContent = 'Alle Pakete sind aktuell! 🎉';
+            noUpdatesElement.textContent = t('allPackagesUpToDate');
             updateList.appendChild(noUpdatesElement);
         }
         
     } catch (error) {
         console.error('Fehler beim Prüfen der Updates:', error);
-        document.getElementById('update-count').textContent = 'Fehler beim Prüfen der Updates';
+        document.getElementById('update-count').textContent = t('errorCheckingUpdates');
         document.getElementById('update-count').className = 'update-count error';
     } finally {
         const updateButton = document.getElementById('check-updates');
@@ -1206,10 +1275,10 @@ async function installUpdates() {
                                 if (rebootResult.success) {
                                     alert('System wird neu gestartet...');
                                 } else {
-                                    alert(`Fehler beim Neustart: ${rebootResult.error}`);
+                                    alert(`${t('errorRebootingSystem')}: ${rebootResult.error}`);
                                 }
                             } catch (error) {
-                                alert('Fehler beim Neustart des Systems');
+                                alert(t('errorRebootingSystem'));
                             }
                         }
                     });
@@ -1241,9 +1310,9 @@ async function installUpdates() {
         const updateCount = document.getElementById('update-count');
         updateCount.innerHTML = `
             <div class="update-error">
-                <div class="error-message">❌ Fehler bei der Update-Installation</div>
-                <div class="error-details">Unbekannter Fehler</div>
-                <button onclick="checkUpdates()" class="retry-button">Erneut versuchen</button>
+                <div class="error-message">❌ ${t('errorInstallingUpdatesLong')}</div>
+                <div class="error-details">${t('unknownError')}</div>
+                <button onclick="checkUpdates()" class="retry-button">${t('retryButton')}</button>
             </div>
         `;
     } finally {
@@ -1275,7 +1344,7 @@ async function searchPackages() {
         }
     } catch (error) {
         console.error('Fehler bei der Paketsuche:', error);
-        showSearchError('Unbekannter Fehler bei der Suche');
+        showSearchError(t('unknownSearchError'));
     } finally {
         searchButton.textContent = originalText;
         searchButton.disabled = false;
@@ -1440,7 +1509,7 @@ async function loadFirewallStatus() {
     try {
         const firewallStatus = await window.electronAPI.getFirewallStatus();
         const statusElement = document.getElementById('firewall-status');
-        statusElement.textContent = firewallStatus.active ? 'Aktiv' : 'Inaktiv';
+        statusElement.textContent = firewallStatus.active ? t('active') : t('inactive');
         statusElement.className = `status-indicator ${firewallStatus.active ? 'active' : 'inactive'}`;
     } catch (error) {
         console.error('Fehler beim Laden des Firewall-Status:', error);
@@ -1482,7 +1551,7 @@ async function toggleFirewall() {
     try {
         const result = await window.electronAPI.toggleFirewall();
         if (result.success) {
-            statusElement.textContent = result.active ? 'Aktiv' : 'Inaktiv';
+            statusElement.textContent = result.active ? t('active') : t('inactive');
             statusElement.className = `status-indicator ${result.active ? 'active' : 'inactive'}`;
             
             // Erfolgsmeldung anzeigen
@@ -1491,7 +1560,7 @@ async function toggleFirewall() {
         } else {
             // Benutzerfreundliche Fehlermeldung
             if (result.error.includes('manuell im Terminal aus')) {
-                showNotification('Bitte öffnen Sie ein Terminal und führen den Befehl manuell aus', 'error');
+                showNotification(t('openTerminalManually'), 'error');
             } else {
                 showNotification(`Firewall-Fehler: ${result.error}`, 'error');
             }
@@ -1499,7 +1568,7 @@ async function toggleFirewall() {
         }
     } catch (error) {
         console.error('Fehler beim Toggle der Firewall:', error);
-        showNotification('Unerwarteter Fehler bei der Firewall-Einstellung', 'error');
+        showNotification(t('unexpectedFirewallError'), 'error');
         toggleButton.textContent = originalText;
     } finally {
         toggleButton.disabled = false;
@@ -1519,7 +1588,7 @@ async function executeCommand(command) {
         }
     } catch (error) {
         console.error('Fehler beim Ausführen des Befehls:', error);
-        showNotification('Fehler beim Ausführen des Befehls', 'error');
+        showNotification(t('commandExecutionError'), 'error');
     }
 }
 
@@ -1573,6 +1642,93 @@ function showNotification(message, type = 'info', duration = 3000) {
     return notification;
 }
 
+// Action Notification with "Open File" button
+function showActionNotification(message, filepath, type = 'success', duration = 5000) {
+    // Create notification container if it doesn't exist
+    let notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            pointer-events: none;
+        `;
+        document.body.appendChild(notificationContainer);
+    }
+    
+    // Create action notification
+    const notification = document.createElement('div');
+    const notificationId = 'notification-' + Date.now() + Math.random().toString(36).substr(2, 9);
+    notification.id = notificationId;
+    notification.className = `notification ${type} action-notification`;
+    notification.style.cssText = `
+        margin-bottom: 8px;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        min-width: 300px;
+    `;
+    
+    notification.innerHTML = `
+        <span class="notification-message">${message}</span>
+        <button class="notification-action-btn" onclick="openExportedFile('${filepath}', '${notificationId}')">
+            📂 Datei öffnen
+        </button>
+    `;
+    
+    // Add to container
+    notificationContainer.appendChild(notification);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        notification.classList.add('show');
+    });
+    
+    // Auto-hide after duration
+    const hideTimeout = setTimeout(() => {
+        notification.classList.remove('show');
+        // Remove from DOM after animation
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, duration);
+    
+    // Store timeout for potential cleanup
+    notification.hideTimeout = hideTimeout;
+    
+    return notification;
+}
+
+// Global function to open exported file
+window.openExportedFile = async function(filepath, notificationId) {
+    try {
+        const result = await window.electronAPI.openFile(filepath);
+        if (result.success) {
+            // Hide the notification immediately when file is opened
+            const notification = document.getElementById(notificationId);
+            if (notification) {
+                clearTimeout(notification.hideTimeout);
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }
+    } catch (error) {
+        console.error('Fehler beim Öffnen der Datei:', error);
+        showNotification(t('fileOpenError'), 'error');
+    }
+}
+
 // Clear Terminal with memory management
 function clearTerminal() {
     const terminalOutput = document.getElementById('terminal-output');
@@ -1601,7 +1757,7 @@ function clearTerminal() {
 // New Terminal
 function newTerminal() {
     clearTerminal();
-    showNotification('Neues Terminal gestartet', 'success');
+    showNotification(t('newTerminalStarted'), 'success');
 }
 
 // Setup Terminal
@@ -1739,37 +1895,185 @@ function formatBytes(bytes) {
     return window.electronAPI.formatBytes(bytes);
 }
 
+// Export System Report Functions
+async function showExportDialog() {
+    const dialog = document.createElement('div');
+    dialog.className = 'export-dialog-overlay';
+    dialog.innerHTML = `
+        <div class="export-dialog">
+            <div class="export-dialog-header">
+                <h3>📊 System Report exportieren</h3>
+                <button class="export-dialog-close" onclick="closeExportDialog()">&times;</button>
+            </div>
+            <div class="export-dialog-content">
+                <p>Wählen Sie das Format für den Export:</p>
+                <div class="export-format-options">
+                    <button class="export-format-btn" data-format="json">
+                        📄 JSON<br>
+                        <small>Maschinell lesbar</small>
+                    </button>
+                    <button class="export-format-btn" data-format="txt">
+                        📝 Text<br>
+                        <small>Einfach lesbar</small>
+                    </button>
+                    <button class="export-format-btn" data-format="html">
+                        🌐 HTML<br>
+                        <small>Web-Format</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Event-Listener für Format-Buttons
+    dialog.querySelectorAll('.export-format-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const format = e.currentTarget.dataset.format;
+            exportSystemReport(format);
+            closeExportDialog();
+        });
+    });
+}
+
+function closeExportDialog() {
+    const dialog = document.querySelector('.export-dialog-overlay');
+    if (dialog) {
+        dialog.remove();
+    }
+}
+
+async function exportSystemReport(format) {
+    try {
+        showNotification('Sammle Systemdaten...', 'info');
+        
+        // Aktuelle Systemdaten sammeln
+        const systemData = await collectSystemData();
+        
+        showNotification(`Exportiere als ${format.toUpperCase()}...`, 'info');
+        
+        // Export über Backend
+        const result = await window.electronAPI.exportSystemReport(format, systemData);
+        
+        if (result.success) {
+            showActionNotification(result.message, result.filepath, 'success');
+        } else {
+            showNotification(result.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Export-Fehler:', error);
+        showNotification(t('exportFailedWithReason') + ': ' + error.message, 'error');
+    }
+}
+
+async function collectSystemData() {
+    try {
+        // Parallel alle Systemdaten sammeln
+        const [systemInfo, processes, networkInfo] = await Promise.all([
+            window.electronAPI.getSystemInfo(),
+            window.electronAPI.getProcesses(),
+            window.electronAPI.getNetworkInfo()
+        ]);
+        
+        // Daten strukturieren
+        const data = {
+            timestamp: new Date().toISOString(),
+            system: {
+                os: systemInfo.os?.distro + ' ' + systemInfo.os?.release || 'N/A',
+                kernel: systemInfo.os?.kernel || 'N/A',
+                arch: systemInfo.os?.arch || 'N/A',
+                hostname: systemInfo.os?.hostname || 'N/A',
+                uptime: formatUptime(systemInfo.os?.uptime || 0)
+            },
+            cpu: {
+                model: systemInfo.cpu?.manufacturer + ' ' + systemInfo.cpu?.brand || 'N/A',
+                cores: systemInfo.cpu?.cores || 'N/A',
+                usage: Math.round(systemInfo.cpu?.currentLoad?.currentLoad || 0),
+                temperature: Math.round(systemInfo.cpu?.temperature?.main || 0)
+            },
+            memory: {
+                total: systemInfo.mem?.total || 0,
+                used: systemInfo.mem?.used || 0,
+                available: systemInfo.mem?.available || 0,
+                usage: Math.round(((systemInfo.mem?.used || 0) / (systemInfo.mem?.total || 1)) * 100)
+            },
+            disk: systemInfo.disk ? {
+                total: systemInfo.disk.size || 0,
+                used: systemInfo.disk.used || 0,
+                available: (systemInfo.disk.size || 0) - (systemInfo.disk.used || 0),
+                usage: Math.round(((systemInfo.disk.used || 0) / (systemInfo.disk.size || 1)) * 100)
+            } : null,
+            network: Array.isArray(networkInfo) ? networkInfo.map(iface => ({
+                iface: iface.iface,
+                ip4: iface.ip4,
+                speed: iface.speed,
+                operstate: iface.operstate,
+                type: iface.type
+            })) : [],
+            processes: processes.list?.slice(0, 20).map(proc => ({
+                pid: proc.pid,
+                name: proc.name,
+                cpu: Math.round(proc.cpu || 0),
+                memory: proc.mem || 0,
+                state: proc.state
+            })) || []
+        };
+        
+        return data;
+        
+    } catch (error) {
+        console.error('Fehler beim Sammeln der Systemdaten:', error);
+        throw error;
+    }
+}
+
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) {
+        return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else {
+        return `${minutes}m`;
+    }
+}
+
 // Security Functions
 async function performSecurityScan() {
     try {
-        showNotification('Starte Sicherheitsscan...', 'info');
+        showNotification(t('startingSecurityScan'), 'info');
         
         // Update UI to show scanning state
-        document.getElementById('ssh-status').textContent = 'Prüfe...';
-        document.getElementById('fail2ban-status').textContent = 'Prüfe...';
-        document.getElementById('open-ports').textContent = 'Scanne...';
-        document.getElementById('security-events').innerHTML = '<div class="loading-message">Scanne Sicherheitsereignisse...</div>';
+        document.getElementById('ssh-status').textContent = t('checking');
+        document.getElementById('fail2ban-status').textContent = t('checking');
+        document.getElementById('open-ports').textContent = t('scanning');
+        document.getElementById('security-events').innerHTML = `<div class="loading-message">${t('scanning')} ${t('securityEvents')}...</div>`;
         
         const results = await window.electronAPI.securityScan();
         
         // Update SSH status
         const sshElement = document.getElementById('ssh-status');
         if (sshElement) {
-            sshElement.textContent = results.ssh.message;
+            sshElement.textContent = translateSecurityMessage(results.ssh.message);
             sshElement.className = `metric-value ${results.ssh.status}`;
         }
         
         // Update Fail2Ban status
         const fail2banElement = document.getElementById('fail2ban-status');
         if (fail2banElement) {
-            fail2banElement.textContent = results.fail2ban.message;
+            fail2banElement.textContent = translateSecurityMessage(results.fail2ban.message);
             fail2banElement.className = `metric-value ${results.fail2ban.status}`;
         }
         
         // Update ports status
         const portsElement = document.getElementById('open-ports');
         if (portsElement) {
-            portsElement.textContent = results.ports.message;
+            portsElement.textContent = translateSecurityMessage(results.ports.message);
             portsElement.className = `metric-value ${results.ports.status}`;
         }
         
@@ -1793,10 +2097,10 @@ async function performSecurityScan() {
             eventsContainer.innerHTML = '<div class="loading-message">Keine aktuellen Sicherheitsereignisse</div>';
         }
         
-        showNotification('Sicherheitsscan abgeschlossen', 'success');
+        showNotification(t('securityScanCompleted'), 'success');
     } catch (error) {
         console.error('Fehler beim Sicherheitsscan:', error);
-        showNotification('Fehler beim Sicherheitsscan', 'error');
+        showNotification(t('errorSecurityScan'), 'error');
     }
 }
 
@@ -1826,7 +2130,7 @@ async function checkSecurityUpdates() {
         }
     } catch (error) {
         console.error('Fehler beim Prüfen der Sicherheitsupdates:', error);
-        showNotification('Fehler beim Prüfen der Sicherheitsupdates', 'error');
+        showNotification(t('errorCheckingSecurityUpdates'), 'error');
     }
 }
 
@@ -1845,7 +2149,7 @@ async function auditPackages() {
         }
     } catch (error) {
         console.error('Fehler beim Paket-Audit:', error);
-        showNotification('Fehler beim Paket-Audit', 'error');
+        showNotification(t('errorPackageAudit'), 'error');
     }
 }
 
@@ -1862,7 +2166,7 @@ async function checkRootkits() {
         }
     } catch (error) {
         console.error('Fehler beim Rootkit-Scan:', error);
-        showNotification('Fehler beim Rootkit-Scan', 'error');
+        showNotification(t('errorRootkitScan'), 'error');
     }
 }
 
@@ -1879,7 +2183,7 @@ async function performNetworkScan() {
         }
     } catch (error) {
         console.error('Fehler beim Netzwerk-Scan:', error);
-        showNotification('Fehler beim Netzwerk-Scan', 'error');
+        showNotification(t('errorNetworkScan'), 'error');
     }
 }
 

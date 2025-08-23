@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeToTray: () => ipcRenderer.invoke('minimize-to-tray'),
   showFromTray: () => ipcRenderer.invoke('show-from-tray'),
   
+  // Export Functions
+  exportSystemReport: (format, data) => ipcRenderer.invoke('export-system-report', format, data),
+  openFile: (filepath) => ipcRenderer.invoke('open-file', filepath),
+  
   // Utility
   formatBytes: (bytes) => {
     if (bytes === 0) return '0 B';
