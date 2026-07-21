@@ -84,6 +84,7 @@
           ]
         }
       ],
+      "maintainer": "Avacon00 <Avacon00@users.noreply.github.com>",
       "category": "System",
       "synopsis": "Modernes System-Dashboard für Linux",
       "description": "Ein benutzerfreundliches System-Monitoring-Tool für Linux mit Echtzeit-Metriken, Paket-Management und Sicherheits-Features.",
