@@ -5,6 +5,12 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed (CI)
+- Root Cause der seit dem allerersten Commit durchgehend roten CI-Pipeline gefunden und
+  behoben: `electron-builder` brach den `.deb`-Build ohne `author.email`/`linux.maintainer`
+  in `package.json` ab (`Please specify author 'email' in the application package.json`).
+  Behoben über `build.linux.maintainer`.
+
 ### Security
 - Command Injection im Sandbox-Terminal behoben: `execute-terminal-command` nutzt jetzt
   `execFile()` statt `exec()` (kein `/bin/sh -c` mehr); bisher deklarierte, aber nie
