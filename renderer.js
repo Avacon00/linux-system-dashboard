@@ -6,17 +6,8 @@ let updateInterval = null;
 let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performance
 let terminalHistoryCount = 0; // Track terminal lines for memory management
 const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
-
-// Escaped HTML-Sonderzeichen, bevor dynamische/externe Daten (z.B. AUR-Paketmetadaten,
-// Terminal-Ein-/Ausgabe, System-Logs) in innerHTML-Templates eingesetzt werden.
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+// escapeHtml() wird global durch escape-html.js bereitgestellt (vor renderer.js geladen)
+let searchTimeout; // Debounce-Timer für die Paketsuche (auch im beforeunload-Handler genutzt)
 
 // PERFORMANCE FIX: Static System Info Cache (never changes during runtime)
 let staticSystemInfo = null;
@@ -162,7 +153,6 @@ function setupEventListeners() {
     });
     
     // Add real-time search after 2 seconds of inactivity
-    let searchTimeout;
     document.getElementById('package-search').addEventListener('input', (e) => {
         clearTimeout(searchTimeout);
         const query = e.target.value.trim();
@@ -275,8 +265,7 @@ async function runAllSecurityChecks() {
     const progressContainer = document.getElementById('security-progress');
     const progressFill = document.getElementById('security-progress-fill');
     const progressText = document.getElementById('security-progress-text');
-    const actionCards = document.querySelectorAll('.security-action-card');
-    
+
     const actions = [
         { action: 'check-updates-security', name: t('securityUpdatesName') },
         { action: 'audit-packages', name: t('packageSecurityName') },
@@ -332,17 +321,10 @@ function showSecuritySummary(results) {
     let score = 0;
     const maxScore = 100;
     const pointsPerSuccess = 25;
-    
-    let successCount = 0;
-    let warningCount = 0;
-    let errorCount = 0;
-    
+
     results.forEach(result => {
         if (result.status === 'success') {
-            successCount++;
             score += pointsPerSuccess;
-        } else {
-            errorCount++;
         }
     });
     
@@ -1001,15 +983,6 @@ function updateCharts() {
     });
 }
 
-// Compatibility aliases
-async function loadProcesses() {
-    await loadProcessesOptimized();
-}
-
-async function loadNetworkInfo() {
-    await loadNetworkInfoOptimized();
-}
-
 // OPTIMIERTE FUNKTIONEN FÜR BESSERE PERFORMANCE
 
 // Optimierte Prozess-Ladung mit Caching und Lazy Loading
@@ -1124,9 +1097,9 @@ async function forceLoadNetwork() {
 
 // Check Updates
 async function checkUpdates() {
+    const updateButton = document.getElementById('check-updates');
+    const originalText = updateButton.textContent;
     try {
-        const updateButton = document.getElementById('check-updates');
-        const originalText = updateButton.textContent;
         updateButton.textContent = t('checkingUpdates');
         updateButton.disabled = true;
         
@@ -1195,7 +1168,6 @@ async function checkUpdates() {
         document.getElementById('update-count').textContent = t('errorCheckingUpdates');
         document.getElementById('update-count').className = 'update-count error';
     } finally {
-        const updateButton = document.getElementById('check-updates');
         updateButton.textContent = originalText;
         updateButton.disabled = false;
     }
@@ -1203,9 +1175,9 @@ async function checkUpdates() {
 
 // Install Updates mit erweitertem Feedback
 async function installUpdates() {
+    const installButton = document.getElementById('install-updates');
+    const originalText = installButton.textContent;
     try {
-        const installButton = document.getElementById('install-updates');
-        const originalText = installButton.textContent;
         installButton.textContent = 'Installiere Updates...';
         installButton.disabled = true;
         
@@ -1329,7 +1301,6 @@ async function installUpdates() {
         `;
         updateCount.querySelector('.retry-button')?.addEventListener('click', checkUpdates);
     } finally {
-        const installButton = document.getElementById('install-updates');
         installButton.textContent = originalText;
         installButton.disabled = false;
     }
@@ -1727,7 +1698,7 @@ function showActionNotification(message, filepath, type = 'success', duration = 
 }
 
 // Global function to open exported file
-window.openExportedFile = async function(filepath, notificationId) {
+async function openExportedFile(filepath, notificationId) {
     try {
         const result = await window.electronAPI.openFile(filepath);
         if (result.success) {
@@ -1783,7 +1754,6 @@ function newTerminal() {
 // Setup Terminal
 function setupTerminal() {
     const terminalInput = document.getElementById('terminal-input');
-    const terminalOutput = document.getElementById('terminal-output');
 
     if (!terminalInput) return;
 
@@ -2007,7 +1977,7 @@ async function collectSystemData() {
                 kernel: systemInfo.os?.kernel || 'N/A',
                 arch: systemInfo.os?.arch || 'N/A',
                 hostname: systemInfo.os?.hostname || 'N/A',
-                uptime: formatUptime(systemInfo.os?.uptime || 0)
+                uptime: formatUptimeCompact(systemInfo.os?.uptime || 0)
             },
             cpu: {
                 model: systemInfo.cpu?.manufacturer + ' ' + systemInfo.cpu?.brand || 'N/A',
@@ -2051,11 +2021,14 @@ async function collectSystemData() {
     }
 }
 
-function formatUptime(seconds) {
+// Kompaktes Uptime-Format nur für den Export-Report (vorher versehentlich als zweite
+// "formatUptime"-Deklaration definiert, die die verbose Variante oben stillschweigend
+// überschrieben hat und dadurch die Haupt-Uptime-Anzeige verfälschte).
+function formatUptimeCompact(seconds) {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (days > 0) {
         return `${days}d ${hours}h ${minutes}m`;
     } else if (hours > 0) {
@@ -2227,7 +2200,7 @@ window.addEventListener('beforeunload', () => {
     }
     
     // Clear all timeouts
-    if (typeof searchTimeout !== 'undefined' && searchTimeout) {
+    if (searchTimeout) {
         clearTimeout(searchTimeout);
         searchTimeout = null;
     }

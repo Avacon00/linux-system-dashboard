@@ -1,0 +1,61 @@
+{
+  "root": true,
+  "env": {
+    "es2021": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "script"
+  },
+  "ignorePatterns": ["dist/", "build/", "node_modules/"],
+  "rules": {
+    "no-unused-vars": ["warn", { "args": "none" }],
+    "no-empty": ["warn", { "allowEmptyCatch": true }]
+  },
+  "overrides": [
+    {
+      "files": ["renderer.js"],
+      "env": {
+        "browser": true,
+        "node": false
+      },
+      "globals": {
+        "t": "readonly",
+        "switchLanguage": "readonly",
+        "updateLanguageDisplay": "readonly",
+        "updateAllTexts": "readonly",
+        "escapeHtml": "readonly",
+        "Chart": "readonly"
+      }
+    },
+    {
+      "files": ["preload.js"],
+      "env": {
+        "browser": false,
+        "node": true
+      }
+    },
+    {
+      "files": ["translations.js", "escape-html.js"],
+      "env": {
+        "browser": true,
+        "node": true
+      }
+    },
+    {
+      "files": ["temperature-worker.js"],
+      "env": {
+        "browser": false,
+        "worker": true
+      }
+    },
+    {
+      "files": ["__tests__/**/*.js"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}

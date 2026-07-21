@@ -5,6 +5,7 @@ const si = require('systeminformation');
 const { exec, execFile } = require('child_process');
 const fs = require('fs');
 const sudo = require('sudo-prompt');
+const { ALLOWED_COMMANDS, validateTerminalArgs } = require('./terminal-security');
 // Auto-Updater - robust laden
 let AutoUpdater;
 try {
@@ -46,8 +47,8 @@ function createWindow() {
         autoUpdater.checkForUpdatesOnStartup();
         autoUpdater.startPeriodicUpdateCheck();
       } catch (error) {
+        console.error('Auto-Updater konnte nicht gestartet werden:', error.message);
       }
-    } else {
     }
   });
 
@@ -280,61 +281,6 @@ ipcMain.handle('get-system-info', async () => {
   }
 });
 
-// Hilfsfunktion für CPU-Statistiken aus /proc/stat
-async function getCpuStats() {
-  return new Promise((resolve, reject) => {
-    exec('cat /proc/stat', (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      
-      const lines = stdout.trim().split('\n');
-      const cpuLine = lines[0]; // Gesamt-CPU
-      const coreLines = lines.filter(line => line.startsWith('cpu') && line.match(/^cpu\d+/));
-      
-      // Parse Gesamt-CPU
-      const totalParts = cpuLine.split(/\s+/);
-      const totalUser = parseInt(totalParts[1]) || 0;
-      const totalNice = parseInt(totalParts[2]) || 0;
-      const totalSystem = parseInt(totalParts[3]) || 0;
-      const totalIdle = parseInt(totalParts[4]) || 0;
-      const totalIoWait = parseInt(totalParts[5]) || 0;
-      const totalIrq = parseInt(totalParts[6]) || 0;
-      const totalSoftIrq = parseInt(totalParts[7]) || 0;
-      
-      const totalActive = totalUser + totalNice + totalSystem + totalIrq + totalSoftIrq;
-      const total = totalActive + totalIdle + totalIoWait;
-      
-      // Parse individuelle Kerne
-      const cores = coreLines.map(line => {
-        const parts = line.split(/\s+/);
-        const user = parseInt(parts[1]) || 0;
-        const nice = parseInt(parts[2]) || 0;
-        const system = parseInt(parts[3]) || 0;
-        const idle = parseInt(parts[4]) || 0;
-        const ioWait = parseInt(parts[5]) || 0;
-        const irq = parseInt(parts[6]) || 0;
-        const softIrq = parseInt(parts[7]) || 0;
-        
-        const active = user + nice + system + irq + softIrq;
-        const coreTotal = active + idle + ioWait;
-        
-        return {
-          total: coreTotal,
-          idle: idle + ioWait
-        };
-      });
-      
-      resolve({
-        total: total,
-        idle: totalIdle + totalIoWait,
-        cores: cores
-      });
-    });
-  });
-}
-
 // IPC Handler für Prozesse
 ipcMain.handle('get-processes', async () => {
   try {
@@ -538,7 +484,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
   }
   
   // Entferne gefährliche Zeichen für die Suche
-  const sanitizedSearchTerm = searchTerm.replace(/[^a-zA-Z0-9\-_\.\s]/g, '');
+  const sanitizedSearchTerm = searchTerm.replace(/[^a-zA-Z0-9\-_.\s]/g, '');
   if (!sanitizedSearchTerm) {
     return { success: false, error: 'Leerer Suchbegriff' };
   }
@@ -553,7 +499,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
         const lines = pacmanStdout.trim().split('\n');
         for (let i = 0; i < lines.length; i += 2) {
           if (lines[i] && lines[i + 1]) {
-            const match = lines[i].match(/^(\S+)\/(\S+)\s+([^\[]+)(?:\[.*\])?\s*$/);
+            const match = lines[i].match(/^(\S+)\/(\S+)\s+([^[]+)(?:\[.*\])?\s*$/);
             if (match) {
               const [, repo, name, version] = match;
               const description = lines[i + 1].trim();
@@ -588,7 +534,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
               const lines = yayStdout.trim().split('\n');
               for (let i = 0; i < lines.length; i += 2) {
                 if (lines[i] && lines[i + 1] && lines[i].startsWith('aur/')) {
-                  const match = lines[i].match(/^aur\/(\S+)\s+([^\(]+)(?:\([^)]+\))?\s*$/);
+                  const match = lines[i].match(/^aur\/(\S+)\s+([^(]+)(?:\([^)]+\))?\s*$/);
                   if (match) {
                     const [, name, version] = match;
                     const description = lines[i + 1].trim();
@@ -649,7 +595,7 @@ ipcMain.handle('install-package-with-progress', async (event, packageName, sourc
   }
   
   // Entferne gefährliche Zeichen
-  const sanitizedPackageName = packageName.replace(/[^a-zA-Z0-9\-_\.]/g, '');
+  const sanitizedPackageName = packageName.replace(/[^a-zA-Z0-9\-_.]/g, '');
   if (sanitizedPackageName !== packageName) {
     return { success: false, error: 'Paketname enthält ungültige Zeichen' };
   }
@@ -807,6 +753,7 @@ ipcMain.handle('install-updates', async () => {
       // Lock-Datei prüfen und entfernen falls vorhanden
       exec('sudo rm -f /var/lib/pacman/db.lck', (lockError) => {
         if (lockError) {
+          console.warn('pacman Lock-Datei konnte nicht entfernt werden (evtl. nicht vorhanden):', lockError.message);
         }
 
         // Updates installieren mit detaillierter Ausgabe
@@ -1426,6 +1373,7 @@ ipcMain.handle('check-rootkits', async () => {
     
     return new Promise((resolve) => {
       // Simple check for common rootkit indicators
+      // eslint-disable-next-line no-useless-escape -- \. wird von der grep -E Regex benötigt (literaler Punkt), keine JS-Regex
       exec('ls -la /tmp /var/tmp | grep -E "(\.\.|\.|[0-9]+)$" | wc -l', (error, stdout) => {
         if (!error) {
           const suspiciousFiles = parseInt(stdout.trim()) || 0;
@@ -1456,112 +1404,8 @@ ipcMain.handle('check-rootkits', async () => {
 // ============================================================================
 // TERMINAL-BACKEND - SECURE COMMAND EXECUTION
 // ============================================================================
-
-// Erlaubte Befehle für Sicherheit (Whitelist-Ansatz)
-const ALLOWED_COMMANDS = {
-  // System-Information
-  'ls': { safe: true, description: 'Dateien auflisten' },
-  'pwd': { safe: true, description: 'Aktuelles Verzeichnis anzeigen' },
-  'whoami': { safe: true, description: 'Aktueller Benutzer' },
-  'date': { safe: true, description: 'Aktuelles Datum und Zeit' },
-  'uptime': { safe: true, description: 'System-Laufzeit' },
-  'id': { safe: true, description: 'Benutzer-ID anzeigen' },
-  'groups': { safe: true, description: 'Benutzergruppen anzeigen' },
-  
-  // System-Monitoring
-  'htop': { safe: true, description: 'Prozess-Monitor starten', requiresTerminal: true },
-  'top': { safe: true, description: 'Prozess-Monitor (minimal)' },
-  'ps': { safe: true, description: 'Laufende Prozesse anzeigen' },
-  'df': { safe: true, description: 'Festplatten-Nutzung anzeigen' },
-  'free': { safe: true, description: 'Arbeitsspeicher-Nutzung anzeigen' },
-  'lscpu': { safe: true, description: 'CPU-Informationen anzeigen' },
-  'lsblk': { safe: true, description: 'Block-Geräte auflisten' },
-  'mount': { safe: true, description: 'Gemountete Dateisysteme anzeigen' },
-  'ip': { safe: true, description: 'Netzwerk-Konfiguration anzeigen' },
-  'netstat': { safe: true, description: 'Netzwerk-Verbindungen anzeigen' },
-  
-  // Datei-Operationen (sicher)
-  'cat': { safe: true, description: 'Datei-Inhalt anzeigen', maxArgs: 1 },
-  'head': { safe: true, description: 'Erste Zeilen einer Datei anzeigen' },
-  'tail': { safe: true, description: 'Letzte Zeilen einer Datei anzeigen' },
-  'less': { safe: true, description: 'Datei durchblättern', requiresTerminal: true },
-  'more': { safe: true, description: 'Datei seitenweise anzeigen' },
-  'file': { safe: true, description: 'Dateityp bestimmen' },
-  'wc': { safe: true, description: 'Zeilen, Wörter, Zeichen zählen' },
-  'grep': { safe: true, description: 'Text in Dateien suchen' },
-  'find': { safe: true, description: 'Dateien suchen', timeout: 10000 },
-  
-  // Netzwerk (sicher)
-  'ping': { safe: true, description: 'Netzwerk-Verbindung testen', timeout: 5000 },
-  'wget': { safe: false, description: 'Datei herunterladen - nicht erlaubt' },
-  'curl': { safe: false, description: 'HTTP-Anfragen - nicht erlaubt' },
-  
-  // System-Administration (eingeschränkt)
-  'systemctl': { safe: true, description: 'Systemd-Services verwalten (nur Status-Abfragen)', sudoOnly: true, allowedSubcommands: ['status', 'list-units', 'list-unit-files', 'is-active', 'is-enabled', 'is-failed'] },
-  'journalctl': { safe: true, description: 'System-Logs anzeigen' },
-  'dmesg': { safe: true, description: 'Kernel-Nachrichten anzeigen' },
-  
-  // Paket-Management (nur Abfragen)
-  'pacman': { safe: true, description: 'Paket-Manager', allowedFlags: ['-Q', '-Ss', '-Si', '-Ql'], sudoRequired: ['-S', '-R', '-U'] },
-  'yay': { safe: true, description: 'AUR-Helper', allowedFlags: ['-Q', '-Ss', '-Si'], sudoRequired: ['-S', '-R'] },
-  
-  // Git (sicher)
-  'git': { safe: true, description: 'Git-Versionskontrolle', allowedSubcommands: ['status', 'log', 'diff', 'branch', 'remote'] },
-  
-  // Gefährliche Befehle (explizit blockiert)
-  'rm': { safe: false, description: 'Dateien löschen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'mv': { safe: false, description: 'Dateien verschieben - nicht erlaubt', danger: 'DATENÄNDERUNG' },
-  'cp': { safe: false, description: 'Dateien kopieren - nicht erlaubt', danger: 'DATENÄNDERUNG' },
-  'chmod': { safe: false, description: 'Dateiberechtigungen ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'chown': { safe: false, description: 'Dateibesitzer ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'sudo': { safe: false, description: 'Root-Rechte - nicht erlaubt', danger: 'SICHERHEIT' },
-  'su': { safe: false, description: 'Benutzer wechseln - nicht erlaubt', danger: 'SICHERHEIT' },
-  'passwd': { safe: false, description: 'Passwort ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'fdisk': { safe: false, description: 'Partitionen bearbeiten - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'mkfs': { safe: false, description: 'Dateisystem erstellen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'dd': { safe: false, description: 'Daten kopieren - nicht erlaubt', danger: 'DATENLÖSCHUNG' }
-};
-
-// Shell-Metazeichen, die bei execFile() zwar ohnehin nicht interpretiert werden (kein
-// /bin/sh), aber sicherheitshalber explizit zurückgewiesen werden, damit sich niemand auf
-// eine implizite Shell-Auswertung verlassen kann.
-const SHELL_METACHARACTERS = /[;&|`$<>(){}\n]/;
-
-// Prüft die geparsten Argumente eines Terminal-Befehls gegen die in ALLOWED_COMMANDS
-// hinterlegten Einschränkungen (maxArgs / allowedFlags / sudoRequired / allowedSubcommands).
-function validateTerminalArgs(baseCommand, args, commandInfo) {
-  if (SHELL_METACHARACTERS.test(baseCommand) || args.some(arg => SHELL_METACHARACTERS.test(arg))) {
-    return { ok: false, reason: 'Ungültige Zeichen im Befehl (Shell-Metazeichen sind nicht erlaubt).' };
-  }
-
-  if (typeof commandInfo.maxArgs === 'number' && args.length > commandInfo.maxArgs) {
-    return { ok: false, reason: `Befehl '${baseCommand}' erlaubt maximal ${commandInfo.maxArgs} Argument(e).` };
-  }
-
-  if (commandInfo.allowedSubcommands) {
-    const subcommand = args[0];
-    if (!subcommand || !commandInfo.allowedSubcommands.includes(subcommand)) {
-      return { ok: false, reason: `Befehl '${baseCommand}' ist nur mit folgenden Subcommands erlaubt: ${commandInfo.allowedSubcommands.join(', ')}.` };
-    }
-  }
-
-  if (commandInfo.allowedFlags) {
-    const flags = args.filter(arg => arg.startsWith('-'));
-    const disallowedFlag = flags.find(flag => !commandInfo.allowedFlags.includes(flag));
-    if (disallowedFlag) {
-      return { ok: false, reason: `Flag '${disallowedFlag}' ist für '${baseCommand}' nicht erlaubt. Erlaubt: ${commandInfo.allowedFlags.join(', ')}.` };
-    }
-  }
-
-  if (commandInfo.sudoRequired) {
-    const requiresSudo = args.some(arg => commandInfo.sudoRequired.includes(arg));
-    if (requiresSudo) {
-      return { ok: false, reason: `Diese Aktion erfordert Root-Rechte und ist im Sandbox-Terminal nicht erlaubt.` };
-    }
-  }
-
-  return { ok: true };
-}
+// ALLOWED_COMMANDS und validateTerminalArgs leben in terminal-security.js
+// (Import oben), damit sie ohne Electron-Runtime unit-testbar sind.
 
 // Export System Report Handler
 ipcMain.handle('export-system-report', async (_, format, data) => {
