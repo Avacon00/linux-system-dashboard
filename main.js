@@ -859,127 +859,107 @@ ipcMain.handle('get-firewall-status', async () => {
 });
 
 // IPC Handler für Firewall Toggle
-ipcMain.handle('toggle-firewall', async () => {
+// Prüft per `which`, ob ein Befehl verfügbar ist
+function commandExists(cmd) {
   return new Promise((resolve) => {
-    // Prüfe UFW-Status direkt (nicht über systemctl)
-    exec('ufw status', (statusError, statusStdout) => {
-      let isActive = false;
-      
-      if (!statusError && statusStdout) {
-        isActive = statusStdout.includes('Status: active');
-      }
-      
-      
-      // Finde verfügbaren Terminal für sudo-Eingabe
-      const terminals = ['konsole', 'alacritty', 'xterm', 'gnome-terminal', 'xfce4-terminal'];
-      
-      // Asynchrone Terminal-Suche
-      const findTerminal = async () => {
-        for (const terminal of terminals) {
-          try {
-            await new Promise((resolve, reject) => {
-              exec(`which ${terminal}`, (error) => {
-                if (error) reject();
-                else resolve();
-              });
-            });
-            return terminal; // Gefunden!
-          } catch {
-            continue; // Weitersuchen
-          }
-        }
-        return null;
-      };
-      
-      findTerminal().then(availableTerminal => {
-        if (!availableTerminal) {
-          // Fallback: Versuche pkexec (PolicyKit) als Alternative
-          exec('which pkexec', (pkexecError) => {
-            if (!pkexecError) {
-              const command = isActive ? 'pkexec ufw disable' : 'pkexec ufw enable';
-              exec(command, (error, stdout) => {
-                if (error) {
-                  resolve({
-                    success: false,
-                    error: 'Firewall-Änderung abgebrochen oder fehlgeschlagen. Führen Sie den Befehl manuell im Terminal aus: sudo ufw ' + (isActive ? 'disable' : 'enable')
-                  });
-                } else {
-                  resolve({
-                    success: true,
-                    active: !isActive,
-                    message: isActive ? 'Firewall wurde deaktiviert' : 'Firewall wurde aktiviert',
-                    output: stdout
-                  });
-                }
-              });
-            } else {
-              // Weder Terminal noch pkexec verfügbar - Benutzer-Anweisung
-              resolve({
-                success: false,
-                error: `Bitte führen Sie manuell im Terminal aus: sudo ufw ${isActive ? 'disable' : 'enable'}`
-              });
-            }
-          });
-          return;
-        }
-        
-        // Verwende verfügbares Terminal für sudo-Eingabe
-        const action = isActive ? 'disable' : 'enable';
-        const actionText = isActive ? 'deaktiviert' : 'aktiviert';
-        const command = `${availableTerminal} -T "UFW Firewall ${actionText}" -e bash -c "echo 'UFW Firewall wird ${actionText}...'; echo ''; sudo ufw ${action}; echo ''; echo 'Fertig! Drücke Enter zum Schließen...'; read"`;
-        
-        console.log(`Executing: ${command}`);
-        
-        exec(command, (execError, stdout, stderr) => {
-          // Da das Terminal-Fenster geöffnet wird, prüfen wir nach kurzer Zeit den Status
-          setTimeout(() => {
-            exec('ufw status', (checkError, checkStdout) => {
-              let newIsActive = false;
-              
-              if (!checkError && checkStdout) {
-                newIsActive = checkStdout.includes('Status: active');
-              }
-              
-              console.log(`New UFW Status: ${newIsActive ? 'active' : 'inactive'}`);
-              
-              if (newIsActive !== isActive) {
-                // Status hat sich geändert - Erfolg!
-                resolve({
-                  success: true,
-                  active: newIsActive,
-                  message: newIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
-                });
-              } else {
-                // Status unverändert - prüfe nach längerer Zeit noch einmal
-                setTimeout(() => {
-                  exec('ufw status', (finalCheckError, finalCheckStdout) => {
-                    let finalIsActive = false;
-                    
-                    if (!finalCheckError && finalCheckStdout) {
-                      finalIsActive = finalCheckStdout.includes('Status: active');
-                    }
-                    
-                    if (finalIsActive !== isActive) {
-                      resolve({
-                        success: true,
-                        active: finalIsActive,
-                        message: finalIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
-                      });
-                    } else {
-                      resolve({
-                        success: false,
-                        error: 'Firewall-Änderung wurde möglicherweise abgebrochen oder ist fehlgeschlagen'
-                      });
-                    }
-                  });
-                }, 3000); // Warte weitere 3 Sekunden
-              }
-            });
-          }, 2000); // Warte 2 Sekunden nach Terminal-Öffnung
-        });
-      });
-    });
+    exec(`which ${cmd}`, (error) => resolve(!error));
   });
+}
+
+// exec() als Promise, die nie rejected - Aufrufer werten `error` selbst aus
+function execAsync(command, options = {}) {
+  return new Promise((resolve) => {
+    exec(command, options, (error, stdout, stderr) => resolve({ error, stdout, stderr }));
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getUfwActive() {
+  const { error, stdout } = await execAsync('ufw status');
+  return !error && !!stdout && stdout.includes('Status: active');
+}
+
+ipcMain.handle('toggle-firewall', async () => {
+  // Prüfe UFW-Status direkt (nicht über systemctl)
+  const isActive = await getUfwActive();
+
+  // Finde verfügbaren Terminal für sudo-Eingabe
+  const terminals = ['konsole', 'alacritty', 'xterm', 'gnome-terminal', 'xfce4-terminal'];
+  let availableTerminal = null;
+  for (const terminal of terminals) {
+    if (await commandExists(terminal)) {
+      availableTerminal = terminal;
+      break;
+    }
+  }
+
+  if (!availableTerminal) {
+    // Fallback: Versuche pkexec (PolicyKit) als Alternative
+    const hasPkexec = await commandExists('pkexec');
+    if (!hasPkexec) {
+      // Weder Terminal noch pkexec verfügbar - Benutzer-Anweisung
+      return {
+        success: false,
+        error: `Bitte führen Sie manuell im Terminal aus: sudo ufw ${isActive ? 'disable' : 'enable'}`
+      };
+    }
+
+    const pkexecCommand = isActive ? 'pkexec ufw disable' : 'pkexec ufw enable';
+    const { error, stdout } = await execAsync(pkexecCommand);
+    if (error) {
+      return {
+        success: false,
+        error: 'Firewall-Änderung abgebrochen oder fehlgeschlagen. Führen Sie den Befehl manuell im Terminal aus: sudo ufw ' + (isActive ? 'disable' : 'enable')
+      };
+    }
+    return {
+      success: true,
+      active: !isActive,
+      message: isActive ? 'Firewall wurde deaktiviert' : 'Firewall wurde aktiviert',
+      output: stdout
+    };
+  }
+
+  // Verwende verfügbares Terminal für sudo-Eingabe
+  const action = isActive ? 'disable' : 'enable';
+  const actionText = isActive ? 'deaktiviert' : 'aktiviert';
+  const command = `${availableTerminal} -T "UFW Firewall ${actionText}" -e bash -c "echo 'UFW Firewall wird ${actionText}...'; echo ''; sudo ufw ${action}; echo ''; echo 'Fertig! Drücke Enter zum Schließen...'; read"`;
+
+  console.log(`Executing: ${command}`);
+  await execAsync(command);
+
+  // Da das Terminal-Fenster geöffnet wird, prüfen wir nach kurzer Zeit den Status
+  await sleep(2000);
+  const newIsActive = await getUfwActive();
+  console.log(`New UFW Status: ${newIsActive ? 'active' : 'inactive'}`);
+
+  if (newIsActive !== isActive) {
+    // Status hat sich geändert - Erfolg!
+    return {
+      success: true,
+      active: newIsActive,
+      message: newIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
+    };
+  }
+
+  // Status unverändert - prüfe nach längerer Zeit noch einmal
+  await sleep(3000);
+  const finalIsActive = await getUfwActive();
+  if (finalIsActive !== isActive) {
+    return {
+      success: true,
+      active: finalIsActive,
+      message: finalIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
+    };
+  }
+
+  return {
+    success: false,
+    error: 'Firewall-Änderung wurde möglicherweise abgebrochen oder ist fehlgeschlagen'
+  };
 });
 
 // IPC Handler für Kommandoausführung (für Quick Access Tools)

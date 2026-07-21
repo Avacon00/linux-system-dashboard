@@ -63,7 +63,8 @@ const translations = {
         baseSpeed: "Basis-Geschw.",
         maxSpeed: "Max-Geschw.",
         temperature: "Temperatur",
-        
+        estimatedTemperature: "Geschätzter Wert (keine Sensordaten für dieses Gerät verfügbar)",
+
         // Memory Information
         memoryInformation: "Arbeitsspeicher-Informationen",
         total: "Gesamt",
@@ -378,6 +379,7 @@ const translations = {
         baseSpeed: "Base Speed",
         maxSpeed: "Max Speed",
         temperature: "Temperature",
+        estimatedTemperature: "Estimated value (no sensor data available for this device)",
         
         // Memory Information
         memoryInformation: "Memory Information",

@@ -27,7 +27,8 @@
         "updateLanguageDisplay": "readonly",
         "updateAllTexts": "readonly",
         "escapeHtml": "readonly",
-        "Chart": "readonly"
+        "Chart": "readonly",
+        "APP_CONFIG": "readonly"
       }
     },
     {
@@ -38,17 +39,10 @@
       }
     },
     {
-      "files": ["translations.js", "escape-html.js"],
+      "files": ["translations.js", "escape-html.js", "config.js"],
       "env": {
         "browser": true,
         "node": true
-      }
-    },
-    {
-      "files": ["temperature-worker.js"],
-      "env": {
-        "browser": false,
-        "worker": true
       }
     },
     {

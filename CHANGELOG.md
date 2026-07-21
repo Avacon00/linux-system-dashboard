@@ -21,6 +21,10 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
   (vorher: kein Lint, Test-Schritt war ein No-Op ohne vorhandenes `test`-Script).
 - `SECURITY.md`, `.github/dependabot.yml`, `CODEOWNERS`, Issue-/PR-Templates,
   `CONTRIBUTING.md`.
+- `config.js` zentralisiert die bisher über `renderer.js` verstreuten Update-Intervalle/
+  Cache-Dauern/Limits (`APP_CONFIG`).
+- Geschätzte Storage-/System-Temperaturen (ohne echte Sensordaten) werden jetzt mit „~"-Präfix
+  und Tooltip als Schätzwert gekennzeichnet, statt wie eine exakte Messung auszusehen.
 
 ### Fixed
 - Zwei Funktionen hießen beide `formatUptime` in `renderer.js`; die zweite Deklaration
@@ -31,9 +35,19 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
   nie wirklich aufgeräumt.
 - Mehrere doppelte Keys in `translations.js` (u. a. `openTerminal`/`openFileManager` mit
   unterschiedlichen Werten für Button- vs. Tipp-Text) behoben.
-- `translations.js` und `temperature-worker.js` fehlten in der `electron-builder`
-  Datei-Whitelist (`package.json` → `build.files`), obwohl beide zur Laufzeit benötigt werden.
+- `translations.js` fehlte in der `electron-builder` Datei-Whitelist (`package.json` →
+  `build.files`), obwohl es zur Laufzeit benötigt wird.
 - README-Versionsangaben (1.0.7/1.0.8) auf die tatsächliche Version korrigiert.
+
+### Removed
+- `temperature-worker.js` entfernt: ein nie instanziierter Web Worker (kein `new Worker(...)`
+  im Code) mit einer zweiten, unbenutzten Kopie der Temperatur-Simulationslogik.
+- Totes `installPackage`-IPC aus `preload.js` entfernt (kein passender Handler in `main.js`,
+  nur `installPackageWithProgress` wird tatsächlich genutzt).
+- Ungenutzte `getCpuStats()`-Funktion und weitere kompatibilitäts-Aliase in `renderer.js`
+  entfernt.
+- `toggle-firewall`-Handler in `main.js` von tief verschachtelten Callbacks auf async/await
+  umgestellt.
 
 ## [1.0.9] und früher
 

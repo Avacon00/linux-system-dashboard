@@ -3,9 +3,9 @@ let systemInfo = null;
 let cpuChart = null;
 let ramChart = null;
 let updateInterval = null;
-let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performance
+let updateSpeed = APP_CONFIG.UPDATE_SPEED_DEFAULT; // optimiert für bessere Performance
 let terminalHistoryCount = 0; // Track terminal lines for memory management
-const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
+const MAX_TERMINAL_LINES = APP_CONFIG.MAX_TERMINAL_LINES;
 // escapeHtml() wird global durch escape-html.js bereitgestellt (vor renderer.js geladen)
 let searchTimeout; // Debounce-Timer für die Paketsuche (auch im beforeunload-Handler genutzt)
 
@@ -91,6 +91,13 @@ function setupEventListeners() {
             const tabName = item.dataset.tab;
             switchTab(tabName);
         });
+        // Tastatur-Bedienbarkeit (role="tab" + tabindex im HTML)
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchTab(item.dataset.tab);
+            }
+        });
     });
 
     // Title Bar Controls
@@ -111,17 +118,25 @@ function setupEventListeners() {
     });
 
     // Language Switcher
-    document.getElementById('language-switcher').addEventListener('click', () => {
+    const handleLanguageSwitch = () => {
         switchLanguage();
         updateTooltips(); // Update tooltips after language switch
         updatePlaceholders(); // Update placeholders after language switch
-        
+
         // Reload dynamic content with new language
         setTimeout(() => {
             loadSystemInfo(); // Reload system info with translated labels
             loadServices(); // Reload services with translated labels
             loadFirewallStatus(); // Reload firewall status with translated labels
         }, 100);
+    };
+    const languageSwitcherElement = document.getElementById('language-switcher');
+    languageSwitcherElement.addEventListener('click', handleLanguageSwitch);
+    languageSwitcherElement.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleLanguageSwitch();
+        }
     });
 
     // System Refresh
@@ -428,11 +443,16 @@ function showSecuritySummary(results) {
 // Optimierte Tab Navigation mit Performance-Tracking
 function switchTab(tabName) {
     // Remove active class from all items
-    sidebarItems.forEach(item => item.classList.remove('active'));
+    sidebarItems.forEach(item => {
+        item.classList.remove('active');
+        item.setAttribute('aria-selected', 'false');
+    });
     tabContents.forEach(content => content.classList.remove('active'));
 
     // Add active class to selected item and content
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    const activeItem = document.querySelector(`[data-tab="${tabName}"]`);
+    activeItem.classList.add('active');
+    activeItem.setAttribute('aria-selected', 'true');
     document.getElementById(`${tabName}-tab`).classList.add('active');
     
     // Update current tab tracker für Smart Loading
@@ -467,11 +487,11 @@ let lastProcessUpdate = 0;
 let lastNetworkUpdate = 0;
 let processCache = [];
 let networkCache = null;
-const PROCESS_CACHE_DURATION = 6000; // 6 Sekunden Process-Cache
-const NETWORK_CACHE_DURATION = 12000; // 12 Sekunden Network-Cache
+const PROCESS_CACHE_DURATION = APP_CONFIG.PROCESS_CACHE_DURATION;
+const NETWORK_CACHE_DURATION = APP_CONFIG.NETWORK_CACHE_DURATION;
 // Intelligente Update-Intervalle basierend auf Tab-Sichtbarkeit
-const PROCESS_UPDATE_INTERVAL = 8000; // Prozesse alle 8 Sekunden (weniger häufig)
-const NETWORK_UPDATE_INTERVAL = 15000; // Netzwerk alle 15 Sekunden
+const PROCESS_UPDATE_INTERVAL = APP_CONFIG.PROCESS_UPDATE_INTERVAL;
+const NETWORK_UPDATE_INTERVAL = APP_CONFIG.NETWORK_UPDATE_INTERVAL;
 let currentActiveTab = 'system'; // Aktueller Tab-Tracker
 
 async function loadSystemInfo() {
@@ -718,10 +738,12 @@ function updateTemperatureDisplay() {
             storageTempElement.textContent = `${minTemp}°C`;
             storageTempElement.className = `temp-value ${getTempClass(minTemp)}`;
         } else if (temp.cpu && temp.cpu > 0) {
-            // CPU minus 5-10°C für Storage-Temperatur  
+            // Keine echten Sensordaten verfügbar: CPU minus 5-10°C als grobe Schätzung.
+            // Als Schätzwert gekennzeichnet ("~"), da es sich nicht um eine echte Messung handelt.
             const storageTemp = Math.max(temp.cpu - Math.floor(Math.random() * 6 + 5), 25);
-            storageTempElement.textContent = `${storageTemp}°C`;
-            storageTempElement.className = `temp-value ${getTempClass(storageTemp)}`;
+            storageTempElement.textContent = `~${storageTemp}°C`;
+            storageTempElement.title = t('estimatedTemperature');
+            storageTempElement.className = `temp-value estimated ${getTempClass(storageTemp)}`;
         } else {
             storageTempElement.textContent = 'N/A';
             storageTempElement.className = 'temp-value';
@@ -737,10 +759,11 @@ function updateTemperatureDisplay() {
             systemTempElement.textContent = `${avgTemp}°C`;
             systemTempElement.className = `temp-value ${getTempClass(avgTemp)}`;
         } else if (temp.cpu && temp.cpu > 0) {
-            // CPU + 2-5°C Variation für System-Temperatur
+            // Keine echten Sensordaten verfügbar: CPU plus 2-5°C als grobe Schätzung.
             const systemTemp = temp.cpu + Math.floor(Math.random() * 4 + 2);
-            systemTempElement.textContent = `${systemTemp}°C`;
-            systemTempElement.className = `temp-value ${getTempClass(systemTemp)}`;
+            systemTempElement.textContent = `~${systemTemp}°C`;
+            systemTempElement.title = t('estimatedTemperature');
+            systemTempElement.className = `temp-value estimated ${getTempClass(systemTemp)}`;
         } else {
             systemTempElement.textContent = 'N/A';
             systemTempElement.className = 'temp-value';
@@ -938,8 +961,8 @@ function setupCharts() {
 // Update Charts
 // Optimiertes Chart-Update-System
 let lastChartUpdate = 0;
-const CHART_UPDATE_INTERVAL = 4000; // Charts alle 4 Sekunden - reduzierte CPU-Last
-const MAX_CHART_POINTS = 15; // Weniger Datenpunkte für bessere Performance
+const CHART_UPDATE_INTERVAL = APP_CONFIG.CHART_UPDATE_INTERVAL;
+const MAX_CHART_POINTS = APP_CONFIG.MAX_CHART_POINTS;
 
 function updateCharts() {
     if (!systemInfo) return;
@@ -1860,7 +1883,7 @@ function startSystemMonitoring() {
 
 // Performance optimization: Add throttling for expensive operations
 let lastSystemInfoUpdate = 0;
-const SYSTEM_INFO_CACHE_DURATION = 2000; // 2 Sekunden Cache - weniger API-Calls
+const SYSTEM_INFO_CACHE_DURATION = APP_CONFIG.SYSTEM_INFO_CACHE_DURATION;
 
 async function loadSystemInfoThrottled() {
     const now = Date.now();
