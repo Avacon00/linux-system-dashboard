@@ -29,17 +29,17 @@
 
 #### 📦 **AppImage Download:**
 
-**[>> Download Linux-System-Dashboard-1.0.7.AppImage <<](https://github.com/Avacon00/linux-system-dashboard/releases/latest)**
+**[>> Download Linux-System-Dashboard-1.0.9.AppImage <<](https://github.com/Avacon00/linux-system-dashboard/releases/latest)**
 
 ```bash
 # 1. Download (oder Browser-Download)
-wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.0.8.AppImage
+wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.0.9.AppImage
 
 # 2. Ausführbar machen
-chmod +x Linux-System-Dashboard-1.0.8.AppImage
+chmod +x Linux-System-Dashboard-1.0.9.AppImage
 
 # 3. Starten
-./Linux-System-Dashboard-1.0.8.AppImage
+./Linux-System-Dashboard-1.0.9.AppImage
 ```
 
 **Das war's!** 🎉 Keine Installation, keine Konfiguration, keine Probleme!
