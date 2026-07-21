@@ -63,14 +63,14 @@ const translations = {
         baseSpeed: "Basis-Geschw.",
         maxSpeed: "Max-Geschw.",
         temperature: "Temperatur",
-        
+        estimatedTemperature: "Geschätzter Wert (keine Sensordaten für dieses Gerät verfügbar)",
+
         // Memory Information
         memoryInformation: "Arbeitsspeicher-Informationen",
         total: "Gesamt",
         used: "Belegt",
         free: "Frei",
         available: "Verfügbar",
-        active: "Aktiv",
         buffers: "Puffer",
         cached: "Cache",
         
@@ -251,11 +251,8 @@ const translations = {
         // Dynamic Content
         cpuCoresDetail: "CPU-Kerne im Detail:",
         cpuCore: "Kern",
-        memoryInformation: "Arbeitsspeicher-Informationen",
         storageDevices: "Speicher-Geräte",
         temperatureAndSensors: "🌡️ Temperatur & Sensoren",
-        runningProcesses: "Laufende Prozesse",
-        networkInformation: "Netzwerk-Informationen",
         runtime: "Laufzeit",
         
         // Quick Actions Dynamic Content
@@ -314,8 +311,8 @@ const translations = {
         bashManual: "💻 Bash Handbuch",
         sshTutorial: "🔐 SSH Tutorial",
         beginnerTips: "💡 Tipps für Einsteiger",
-        openTerminal: "Terminal öffnen: Strg+Alt+T",
-        openFileManager: "Dateimanager: Super+E",
+        terminalShortcutTip: "Terminal öffnen: Strg+Alt+T",
+        fileManagerShortcutTip: "Dateimanager: Super+E",
         openApplications: "Anwendungen: Super+A",
         regularUpdates: "System-Updates: Regelmäßig ausführen"
     },
@@ -382,6 +379,7 @@ const translations = {
         baseSpeed: "Base Speed",
         maxSpeed: "Max Speed",
         temperature: "Temperature",
+        estimatedTemperature: "Estimated value (no sensor data available for this device)",
         
         // Memory Information
         memoryInformation: "Memory Information",
@@ -389,7 +387,6 @@ const translations = {
         used: "Used",
         free: "Free",
         available: "Available",
-        active: "Active",
         buffers: "Buffers",
         cached: "Cached",
         
@@ -570,11 +567,8 @@ const translations = {
         // Dynamic Content
         cpuCoresDetail: "CPU Cores in Detail:",
         cpuCore: "Core",
-        memoryInformation: "Memory Information",
         storageDevices: "Storage Devices",
         temperatureAndSensors: "🌡️ Temperature & Sensors",
-        runningProcesses: "Running Processes",
-        networkInformation: "Network Information", 
         runtime: "Uptime",
         
         // Quick Actions Dynamic Content
@@ -633,8 +627,8 @@ const translations = {
         bashManual: "💻 Bash Manual",
         sshTutorial: "🔐 SSH Tutorial",
         beginnerTips: "💡 Tips for Beginners",
-        openTerminal: "Open Terminal: Ctrl+Alt+T",
-        openFileManager: "File Manager: Super+E",
+        terminalShortcutTip: "Open Terminal: Ctrl+Alt+T",
+        fileManagerShortcutTip: "File Manager: Super+E",
         openApplications: "Applications: Super+A",
         regularUpdates: "System Updates: Run regularly"
     }

@@ -2,9 +2,10 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require(
 const path = require('path');
 const os = require('os');
 const si = require('systeminformation');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const fs = require('fs');
 const sudo = require('sudo-prompt');
+const { ALLOWED_COMMANDS, validateTerminalArgs } = require('./terminal-security');
 // Auto-Updater - robust laden
 let AutoUpdater;
 try {
@@ -46,8 +47,8 @@ function createWindow() {
         autoUpdater.checkForUpdatesOnStartup();
         autoUpdater.startPeriodicUpdateCheck();
       } catch (error) {
+        console.error('Auto-Updater konnte nicht gestartet werden:', error.message);
       }
-    } else {
     }
   });
 
@@ -280,61 +281,6 @@ ipcMain.handle('get-system-info', async () => {
   }
 });
 
-// Hilfsfunktion für CPU-Statistiken aus /proc/stat
-async function getCpuStats() {
-  return new Promise((resolve, reject) => {
-    exec('cat /proc/stat', (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      
-      const lines = stdout.trim().split('\n');
-      const cpuLine = lines[0]; // Gesamt-CPU
-      const coreLines = lines.filter(line => line.startsWith('cpu') && line.match(/^cpu\d+/));
-      
-      // Parse Gesamt-CPU
-      const totalParts = cpuLine.split(/\s+/);
-      const totalUser = parseInt(totalParts[1]) || 0;
-      const totalNice = parseInt(totalParts[2]) || 0;
-      const totalSystem = parseInt(totalParts[3]) || 0;
-      const totalIdle = parseInt(totalParts[4]) || 0;
-      const totalIoWait = parseInt(totalParts[5]) || 0;
-      const totalIrq = parseInt(totalParts[6]) || 0;
-      const totalSoftIrq = parseInt(totalParts[7]) || 0;
-      
-      const totalActive = totalUser + totalNice + totalSystem + totalIrq + totalSoftIrq;
-      const total = totalActive + totalIdle + totalIoWait;
-      
-      // Parse individuelle Kerne
-      const cores = coreLines.map(line => {
-        const parts = line.split(/\s+/);
-        const user = parseInt(parts[1]) || 0;
-        const nice = parseInt(parts[2]) || 0;
-        const system = parseInt(parts[3]) || 0;
-        const idle = parseInt(parts[4]) || 0;
-        const ioWait = parseInt(parts[5]) || 0;
-        const irq = parseInt(parts[6]) || 0;
-        const softIrq = parseInt(parts[7]) || 0;
-        
-        const active = user + nice + system + irq + softIrq;
-        const coreTotal = active + idle + ioWait;
-        
-        return {
-          total: coreTotal,
-          idle: idle + ioWait
-        };
-      });
-      
-      resolve({
-        total: total,
-        idle: totalIdle + totalIoWait,
-        cores: cores
-      });
-    });
-  });
-}
-
 // IPC Handler für Prozesse
 ipcMain.handle('get-processes', async () => {
   try {
@@ -538,7 +484,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
   }
   
   // Entferne gefährliche Zeichen für die Suche
-  const sanitizedSearchTerm = searchTerm.replace(/[^a-zA-Z0-9\-_\.\s]/g, '');
+  const sanitizedSearchTerm = searchTerm.replace(/[^a-zA-Z0-9\-_.\s]/g, '');
   if (!sanitizedSearchTerm) {
     return { success: false, error: 'Leerer Suchbegriff' };
   }
@@ -553,7 +499,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
         const lines = pacmanStdout.trim().split('\n');
         for (let i = 0; i < lines.length; i += 2) {
           if (lines[i] && lines[i + 1]) {
-            const match = lines[i].match(/^(\S+)\/(\S+)\s+([^\[]+)(?:\[.*\])?\s*$/);
+            const match = lines[i].match(/^(\S+)\/(\S+)\s+([^[]+)(?:\[.*\])?\s*$/);
             if (match) {
               const [, repo, name, version] = match;
               const description = lines[i + 1].trim();
@@ -588,7 +534,7 @@ ipcMain.handle('search-packages', async (_, searchTerm) => {
               const lines = yayStdout.trim().split('\n');
               for (let i = 0; i < lines.length; i += 2) {
                 if (lines[i] && lines[i + 1] && lines[i].startsWith('aur/')) {
-                  const match = lines[i].match(/^aur\/(\S+)\s+([^\(]+)(?:\([^)]+\))?\s*$/);
+                  const match = lines[i].match(/^aur\/(\S+)\s+([^(]+)(?:\([^)]+\))?\s*$/);
                   if (match) {
                     const [, name, version] = match;
                     const description = lines[i + 1].trim();
@@ -649,7 +595,7 @@ ipcMain.handle('install-package-with-progress', async (event, packageName, sourc
   }
   
   // Entferne gefährliche Zeichen
-  const sanitizedPackageName = packageName.replace(/[^a-zA-Z0-9\-_\.]/g, '');
+  const sanitizedPackageName = packageName.replace(/[^a-zA-Z0-9\-_.]/g, '');
   if (sanitizedPackageName !== packageName) {
     return { success: false, error: 'Paketname enthält ungültige Zeichen' };
   }
@@ -807,6 +753,7 @@ ipcMain.handle('install-updates', async () => {
       // Lock-Datei prüfen und entfernen falls vorhanden
       exec('sudo rm -f /var/lib/pacman/db.lck', (lockError) => {
         if (lockError) {
+          console.warn('pacman Lock-Datei konnte nicht entfernt werden (evtl. nicht vorhanden):', lockError.message);
         }
 
         // Updates installieren mit detaillierter Ausgabe
@@ -912,127 +859,107 @@ ipcMain.handle('get-firewall-status', async () => {
 });
 
 // IPC Handler für Firewall Toggle
-ipcMain.handle('toggle-firewall', async () => {
+// Prüft per `which`, ob ein Befehl verfügbar ist
+function commandExists(cmd) {
   return new Promise((resolve) => {
-    // Prüfe UFW-Status direkt (nicht über systemctl)
-    exec('ufw status', (statusError, statusStdout) => {
-      let isActive = false;
-      
-      if (!statusError && statusStdout) {
-        isActive = statusStdout.includes('Status: active');
-      }
-      
-      
-      // Finde verfügbaren Terminal für sudo-Eingabe
-      const terminals = ['konsole', 'alacritty', 'xterm', 'gnome-terminal', 'xfce4-terminal'];
-      
-      // Asynchrone Terminal-Suche
-      const findTerminal = async () => {
-        for (const terminal of terminals) {
-          try {
-            await new Promise((resolve, reject) => {
-              exec(`which ${terminal}`, (error) => {
-                if (error) reject();
-                else resolve();
-              });
-            });
-            return terminal; // Gefunden!
-          } catch {
-            continue; // Weitersuchen
-          }
-        }
-        return null;
-      };
-      
-      findTerminal().then(availableTerminal => {
-        if (!availableTerminal) {
-          // Fallback: Versuche pkexec (PolicyKit) als Alternative
-          exec('which pkexec', (pkexecError) => {
-            if (!pkexecError) {
-              const command = isActive ? 'pkexec ufw disable' : 'pkexec ufw enable';
-              exec(command, (error, stdout) => {
-                if (error) {
-                  resolve({
-                    success: false,
-                    error: 'Firewall-Änderung abgebrochen oder fehlgeschlagen. Führen Sie den Befehl manuell im Terminal aus: sudo ufw ' + (isActive ? 'disable' : 'enable')
-                  });
-                } else {
-                  resolve({
-                    success: true,
-                    active: !isActive,
-                    message: isActive ? 'Firewall wurde deaktiviert' : 'Firewall wurde aktiviert',
-                    output: stdout
-                  });
-                }
-              });
-            } else {
-              // Weder Terminal noch pkexec verfügbar - Benutzer-Anweisung
-              resolve({
-                success: false,
-                error: `Bitte führen Sie manuell im Terminal aus: sudo ufw ${isActive ? 'disable' : 'enable'}`
-              });
-            }
-          });
-          return;
-        }
-        
-        // Verwende verfügbares Terminal für sudo-Eingabe
-        const action = isActive ? 'disable' : 'enable';
-        const actionText = isActive ? 'deaktiviert' : 'aktiviert';
-        const command = `${availableTerminal} -T "UFW Firewall ${actionText}" -e bash -c "echo 'UFW Firewall wird ${actionText}...'; echo ''; sudo ufw ${action}; echo ''; echo 'Fertig! Drücke Enter zum Schließen...'; read"`;
-        
-        console.log(`Executing: ${command}`);
-        
-        exec(command, (execError, stdout, stderr) => {
-          // Da das Terminal-Fenster geöffnet wird, prüfen wir nach kurzer Zeit den Status
-          setTimeout(() => {
-            exec('ufw status', (checkError, checkStdout) => {
-              let newIsActive = false;
-              
-              if (!checkError && checkStdout) {
-                newIsActive = checkStdout.includes('Status: active');
-              }
-              
-              console.log(`New UFW Status: ${newIsActive ? 'active' : 'inactive'}`);
-              
-              if (newIsActive !== isActive) {
-                // Status hat sich geändert - Erfolg!
-                resolve({
-                  success: true,
-                  active: newIsActive,
-                  message: newIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
-                });
-              } else {
-                // Status unverändert - prüfe nach längerer Zeit noch einmal
-                setTimeout(() => {
-                  exec('ufw status', (finalCheckError, finalCheckStdout) => {
-                    let finalIsActive = false;
-                    
-                    if (!finalCheckError && finalCheckStdout) {
-                      finalIsActive = finalCheckStdout.includes('Status: active');
-                    }
-                    
-                    if (finalIsActive !== isActive) {
-                      resolve({
-                        success: true,
-                        active: finalIsActive,
-                        message: finalIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
-                      });
-                    } else {
-                      resolve({
-                        success: false,
-                        error: 'Firewall-Änderung wurde möglicherweise abgebrochen oder ist fehlgeschlagen'
-                      });
-                    }
-                  });
-                }, 3000); // Warte weitere 3 Sekunden
-              }
-            });
-          }, 2000); // Warte 2 Sekunden nach Terminal-Öffnung
-        });
-      });
-    });
+    exec(`which ${cmd}`, (error) => resolve(!error));
   });
+}
+
+// exec() als Promise, die nie rejected - Aufrufer werten `error` selbst aus
+function execAsync(command, options = {}) {
+  return new Promise((resolve) => {
+    exec(command, options, (error, stdout, stderr) => resolve({ error, stdout, stderr }));
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getUfwActive() {
+  const { error, stdout } = await execAsync('ufw status');
+  return !error && !!stdout && stdout.includes('Status: active');
+}
+
+ipcMain.handle('toggle-firewall', async () => {
+  // Prüfe UFW-Status direkt (nicht über systemctl)
+  const isActive = await getUfwActive();
+
+  // Finde verfügbaren Terminal für sudo-Eingabe
+  const terminals = ['konsole', 'alacritty', 'xterm', 'gnome-terminal', 'xfce4-terminal'];
+  let availableTerminal = null;
+  for (const terminal of terminals) {
+    if (await commandExists(terminal)) {
+      availableTerminal = terminal;
+      break;
+    }
+  }
+
+  if (!availableTerminal) {
+    // Fallback: Versuche pkexec (PolicyKit) als Alternative
+    const hasPkexec = await commandExists('pkexec');
+    if (!hasPkexec) {
+      // Weder Terminal noch pkexec verfügbar - Benutzer-Anweisung
+      return {
+        success: false,
+        error: `Bitte führen Sie manuell im Terminal aus: sudo ufw ${isActive ? 'disable' : 'enable'}`
+      };
+    }
+
+    const pkexecCommand = isActive ? 'pkexec ufw disable' : 'pkexec ufw enable';
+    const { error, stdout } = await execAsync(pkexecCommand);
+    if (error) {
+      return {
+        success: false,
+        error: 'Firewall-Änderung abgebrochen oder fehlgeschlagen. Führen Sie den Befehl manuell im Terminal aus: sudo ufw ' + (isActive ? 'disable' : 'enable')
+      };
+    }
+    return {
+      success: true,
+      active: !isActive,
+      message: isActive ? 'Firewall wurde deaktiviert' : 'Firewall wurde aktiviert',
+      output: stdout
+    };
+  }
+
+  // Verwende verfügbares Terminal für sudo-Eingabe
+  const action = isActive ? 'disable' : 'enable';
+  const actionText = isActive ? 'deaktiviert' : 'aktiviert';
+  const command = `${availableTerminal} -T "UFW Firewall ${actionText}" -e bash -c "echo 'UFW Firewall wird ${actionText}...'; echo ''; sudo ufw ${action}; echo ''; echo 'Fertig! Drücke Enter zum Schließen...'; read"`;
+
+  console.log(`Executing: ${command}`);
+  await execAsync(command);
+
+  // Da das Terminal-Fenster geöffnet wird, prüfen wir nach kurzer Zeit den Status
+  await sleep(2000);
+  const newIsActive = await getUfwActive();
+  console.log(`New UFW Status: ${newIsActive ? 'active' : 'inactive'}`);
+
+  if (newIsActive !== isActive) {
+    // Status hat sich geändert - Erfolg!
+    return {
+      success: true,
+      active: newIsActive,
+      message: newIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
+    };
+  }
+
+  // Status unverändert - prüfe nach längerer Zeit noch einmal
+  await sleep(3000);
+  const finalIsActive = await getUfwActive();
+  if (finalIsActive !== isActive) {
+    return {
+      success: true,
+      active: finalIsActive,
+      message: finalIsActive ? 'UFW Firewall wurde aktiviert' : 'UFW Firewall wurde deaktiviert'
+    };
+  }
+
+  return {
+    success: false,
+    error: 'Firewall-Änderung wurde möglicherweise abgebrochen oder ist fehlgeschlagen'
+  };
 });
 
 // IPC Handler für Kommandoausführung (für Quick Access Tools)
@@ -1426,6 +1353,7 @@ ipcMain.handle('check-rootkits', async () => {
     
     return new Promise((resolve) => {
       // Simple check for common rootkit indicators
+      // eslint-disable-next-line no-useless-escape -- \. wird von der grep -E Regex benötigt (literaler Punkt), keine JS-Regex
       exec('ls -la /tmp /var/tmp | grep -E "(\.\.|\.|[0-9]+)$" | wc -l', (error, stdout) => {
         if (!error) {
           const suspiciousFiles = parseInt(stdout.trim()) || 0;
@@ -1456,71 +1384,8 @@ ipcMain.handle('check-rootkits', async () => {
 // ============================================================================
 // TERMINAL-BACKEND - SECURE COMMAND EXECUTION
 // ============================================================================
-
-// Erlaubte Befehle für Sicherheit (Whitelist-Ansatz)
-const ALLOWED_COMMANDS = {
-  // System-Information
-  'ls': { safe: true, description: 'Dateien auflisten' },
-  'pwd': { safe: true, description: 'Aktuelles Verzeichnis anzeigen' },
-  'whoami': { safe: true, description: 'Aktueller Benutzer' },
-  'date': { safe: true, description: 'Aktuelles Datum und Zeit' },
-  'uptime': { safe: true, description: 'System-Laufzeit' },
-  'id': { safe: true, description: 'Benutzer-ID anzeigen' },
-  'groups': { safe: true, description: 'Benutzergruppen anzeigen' },
-  
-  // System-Monitoring
-  'htop': { safe: true, description: 'Prozess-Monitor starten', requiresTerminal: true },
-  'top': { safe: true, description: 'Prozess-Monitor (minimal)' },
-  'ps': { safe: true, description: 'Laufende Prozesse anzeigen' },
-  'df': { safe: true, description: 'Festplatten-Nutzung anzeigen' },
-  'free': { safe: true, description: 'Arbeitsspeicher-Nutzung anzeigen' },
-  'lscpu': { safe: true, description: 'CPU-Informationen anzeigen' },
-  'lsblk': { safe: true, description: 'Block-Geräte auflisten' },
-  'mount': { safe: true, description: 'Gemountete Dateisysteme anzeigen' },
-  'ip': { safe: true, description: 'Netzwerk-Konfiguration anzeigen' },
-  'netstat': { safe: true, description: 'Netzwerk-Verbindungen anzeigen' },
-  
-  // Datei-Operationen (sicher)
-  'cat': { safe: true, description: 'Datei-Inhalt anzeigen', maxArgs: 1 },
-  'head': { safe: true, description: 'Erste Zeilen einer Datei anzeigen' },
-  'tail': { safe: true, description: 'Letzte Zeilen einer Datei anzeigen' },
-  'less': { safe: true, description: 'Datei durchblättern', requiresTerminal: true },
-  'more': { safe: true, description: 'Datei seitenweise anzeigen' },
-  'file': { safe: true, description: 'Dateityp bestimmen' },
-  'wc': { safe: true, description: 'Zeilen, Wörter, Zeichen zählen' },
-  'grep': { safe: true, description: 'Text in Dateien suchen' },
-  'find': { safe: true, description: 'Dateien suchen', timeout: 10000 },
-  
-  // Netzwerk (sicher)
-  'ping': { safe: true, description: 'Netzwerk-Verbindung testen', timeout: 5000 },
-  'wget': { safe: false, description: 'Datei herunterladen - nicht erlaubt' },
-  'curl': { safe: false, description: 'HTTP-Anfragen - nicht erlaubt' },
-  
-  // System-Administration (eingeschränkt)
-  'systemctl': { safe: true, description: 'Systemd-Services verwalten', sudoOnly: true },
-  'journalctl': { safe: true, description: 'System-Logs anzeigen' },
-  'dmesg': { safe: true, description: 'Kernel-Nachrichten anzeigen' },
-  
-  // Paket-Management (nur Abfragen)
-  'pacman': { safe: true, description: 'Paket-Manager', allowedFlags: ['-Q', '-Ss', '-Si', '-Ql'], sudoRequired: ['-S', '-R', '-U'] },
-  'yay': { safe: true, description: 'AUR-Helper', allowedFlags: ['-Q', '-Ss', '-Si'], sudoRequired: ['-S', '-R'] },
-  
-  // Git (sicher)
-  'git': { safe: true, description: 'Git-Versionskontrolle', allowedSubcommands: ['status', 'log', 'diff', 'branch', 'remote'] },
-  
-  // Gefährliche Befehle (explizit blockiert)
-  'rm': { safe: false, description: 'Dateien löschen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'mv': { safe: false, description: 'Dateien verschieben - nicht erlaubt', danger: 'DATENÄNDERUNG' },
-  'cp': { safe: false, description: 'Dateien kopieren - nicht erlaubt', danger: 'DATENÄNDERUNG' },
-  'chmod': { safe: false, description: 'Dateiberechtigungen ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'chown': { safe: false, description: 'Dateibesitzer ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'sudo': { safe: false, description: 'Root-Rechte - nicht erlaubt', danger: 'SICHERHEIT' },
-  'su': { safe: false, description: 'Benutzer wechseln - nicht erlaubt', danger: 'SICHERHEIT' },
-  'passwd': { safe: false, description: 'Passwort ändern - nicht erlaubt', danger: 'SICHERHEIT' },
-  'fdisk': { safe: false, description: 'Partitionen bearbeiten - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'mkfs': { safe: false, description: 'Dateisystem erstellen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
-  'dd': { safe: false, description: 'Daten kopieren - nicht erlaubt', danger: 'DATENLÖSCHUNG' }
-};
+// ALLOWED_COMMANDS und validateTerminalArgs leben in terminal-security.js
+// (Import oben), damit sie ohne Electron-Runtime unit-testbar sind.
 
 // Export System Report Handler
 ipcMain.handle('export-system-report', async (_, format, data) => {
@@ -1821,18 +1686,28 @@ ipcMain.handle('execute-terminal-command', async (event, commandString) => {
         output: `⚠️  SICHERHEIT: Befehl '${baseCommand}' ist aus Sicherheitsgründen gesperrt.\nGrund: ${commandInfo.danger || 'Potentiell gefährlich'}\n\nVerwenden Sie ein echtes Terminal für administrative Aufgaben.`
       };
     }
-    
+
+    // Argument-Validierung (Shell-Metazeichen, maxArgs, allowedFlags, allowedSubcommands, sudoRequired)
+    const validation = validateTerminalArgs(baseCommand, args, commandInfo);
+    if (!validation.ok) {
+      return {
+        success: false,
+        output: `⚠️  SICHERHEIT: ${validation.reason}`
+      };
+    }
+
     // Timeout für Befehl
     const timeout = commandInfo.timeout || 5000; // 5 Sekunden Standard
-    
-    // Befehl ausführen
+
+    // Befehl ausführen - execFile statt exec: kein "/bin/sh -c", daher werden
+    // Shell-Metazeichen (; & | ` $() < >) in Argumenten niemals interpretiert.
     return new Promise((resolve) => {
-      const child = exec(commandString, {
+      const child = execFile(baseCommand, args, {
         timeout: timeout,
         maxBuffer: 1024 * 1024, // 1MB Buffer
         cwd: process.env.HOME || '/home/user'
       }, (error, stdout, stderr) => {
-        
+
         if (error) {
           // Timeout
           if (error.code === 'TIMEOUT') {

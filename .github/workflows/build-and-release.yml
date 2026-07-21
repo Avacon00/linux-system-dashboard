@@ -37,9 +37,11 @@ jobs:
     - name: Install Node Dependencies
       run: npm ci
 
-    - name: Run Tests (if available)
-      run: npm test --if-present
-      continue-on-error: true
+    - name: Lint
+      run: npm run lint
+
+    - name: Run Tests
+      run: npm test
 
     - name: Build Application
       run: npm run build --if-present

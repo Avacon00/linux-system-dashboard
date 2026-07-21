@@ -3,9 +3,11 @@ let systemInfo = null;
 let cpuChart = null;
 let ramChart = null;
 let updateInterval = null;
-let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performance
+let updateSpeed = APP_CONFIG.UPDATE_SPEED_DEFAULT; // optimiert für bessere Performance
 let terminalHistoryCount = 0; // Track terminal lines for memory management
-const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
+const MAX_TERMINAL_LINES = APP_CONFIG.MAX_TERMINAL_LINES;
+// escapeHtml() wird global durch escape-html.js bereitgestellt (vor renderer.js geladen)
+let searchTimeout; // Debounce-Timer für die Paketsuche (auch im beforeunload-Handler genutzt)
 
 // PERFORMANCE FIX: Static System Info Cache (never changes during runtime)
 let staticSystemInfo = null;
@@ -89,6 +91,13 @@ function setupEventListeners() {
             const tabName = item.dataset.tab;
             switchTab(tabName);
         });
+        // Tastatur-Bedienbarkeit (role="tab" + tabindex im HTML)
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchTab(item.dataset.tab);
+            }
+        });
     });
 
     // Title Bar Controls
@@ -109,17 +118,25 @@ function setupEventListeners() {
     });
 
     // Language Switcher
-    document.getElementById('language-switcher').addEventListener('click', () => {
+    const handleLanguageSwitch = () => {
         switchLanguage();
         updateTooltips(); // Update tooltips after language switch
         updatePlaceholders(); // Update placeholders after language switch
-        
+
         // Reload dynamic content with new language
         setTimeout(() => {
             loadSystemInfo(); // Reload system info with translated labels
             loadServices(); // Reload services with translated labels
             loadFirewallStatus(); // Reload firewall status with translated labels
         }, 100);
+    };
+    const languageSwitcherElement = document.getElementById('language-switcher');
+    languageSwitcherElement.addEventListener('click', handleLanguageSwitch);
+    languageSwitcherElement.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleLanguageSwitch();
+        }
     });
 
     // System Refresh
@@ -151,7 +168,6 @@ function setupEventListeners() {
     });
     
     // Add real-time search after 2 seconds of inactivity
-    let searchTimeout;
     document.getElementById('package-search').addEventListener('input', (e) => {
         clearTimeout(searchTimeout);
         const query = e.target.value.trim();
@@ -264,8 +280,7 @@ async function runAllSecurityChecks() {
     const progressContainer = document.getElementById('security-progress');
     const progressFill = document.getElementById('security-progress-fill');
     const progressText = document.getElementById('security-progress-text');
-    const actionCards = document.querySelectorAll('.security-action-card');
-    
+
     const actions = [
         { action: 'check-updates-security', name: t('securityUpdatesName') },
         { action: 'audit-packages', name: t('packageSecurityName') },
@@ -321,17 +336,10 @@ function showSecuritySummary(results) {
     let score = 0;
     const maxScore = 100;
     const pointsPerSuccess = 25;
-    
-    let successCount = 0;
-    let warningCount = 0;
-    let errorCount = 0;
-    
+
     results.forEach(result => {
         if (result.status === 'success') {
-            successCount++;
             score += pointsPerSuccess;
-        } else {
-            errorCount++;
         }
     });
     
@@ -351,7 +359,7 @@ function showSecuritySummary(results) {
         contentHTML += `
             <div class="summary-item">
                 <div class="summary-icon ${iconClass}">${icon}</div>
-                <div class="summary-text">${result.name}: ${result.message}</div>
+                <div class="summary-text">${escapeHtml(result.name)}: ${escapeHtml(result.message)}</div>
             </div>
         `;
     });
@@ -435,11 +443,16 @@ function showSecuritySummary(results) {
 // Optimierte Tab Navigation mit Performance-Tracking
 function switchTab(tabName) {
     // Remove active class from all items
-    sidebarItems.forEach(item => item.classList.remove('active'));
+    sidebarItems.forEach(item => {
+        item.classList.remove('active');
+        item.setAttribute('aria-selected', 'false');
+    });
     tabContents.forEach(content => content.classList.remove('active'));
 
     // Add active class to selected item and content
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    const activeItem = document.querySelector(`[data-tab="${tabName}"]`);
+    activeItem.classList.add('active');
+    activeItem.setAttribute('aria-selected', 'true');
     document.getElementById(`${tabName}-tab`).classList.add('active');
     
     // Update current tab tracker für Smart Loading
@@ -474,11 +487,11 @@ let lastProcessUpdate = 0;
 let lastNetworkUpdate = 0;
 let processCache = [];
 let networkCache = null;
-const PROCESS_CACHE_DURATION = 6000; // 6 Sekunden Process-Cache
-const NETWORK_CACHE_DURATION = 12000; // 12 Sekunden Network-Cache
+const PROCESS_CACHE_DURATION = APP_CONFIG.PROCESS_CACHE_DURATION;
+const NETWORK_CACHE_DURATION = APP_CONFIG.NETWORK_CACHE_DURATION;
 // Intelligente Update-Intervalle basierend auf Tab-Sichtbarkeit
-const PROCESS_UPDATE_INTERVAL = 8000; // Prozesse alle 8 Sekunden (weniger häufig)
-const NETWORK_UPDATE_INTERVAL = 15000; // Netzwerk alle 15 Sekunden
+const PROCESS_UPDATE_INTERVAL = APP_CONFIG.PROCESS_UPDATE_INTERVAL;
+const NETWORK_UPDATE_INTERVAL = APP_CONFIG.NETWORK_UPDATE_INTERVAL;
 let currentActiveTab = 'system'; // Aktueller Tab-Tracker
 
 async function loadSystemInfo() {
@@ -725,10 +738,12 @@ function updateTemperatureDisplay() {
             storageTempElement.textContent = `${minTemp}°C`;
             storageTempElement.className = `temp-value ${getTempClass(minTemp)}`;
         } else if (temp.cpu && temp.cpu > 0) {
-            // CPU minus 5-10°C für Storage-Temperatur  
+            // Keine echten Sensordaten verfügbar: CPU minus 5-10°C als grobe Schätzung.
+            // Als Schätzwert gekennzeichnet ("~"), da es sich nicht um eine echte Messung handelt.
             const storageTemp = Math.max(temp.cpu - Math.floor(Math.random() * 6 + 5), 25);
-            storageTempElement.textContent = `${storageTemp}°C`;
-            storageTempElement.className = `temp-value ${getTempClass(storageTemp)}`;
+            storageTempElement.textContent = `~${storageTemp}°C`;
+            storageTempElement.title = t('estimatedTemperature');
+            storageTempElement.className = `temp-value estimated ${getTempClass(storageTemp)}`;
         } else {
             storageTempElement.textContent = 'N/A';
             storageTempElement.className = 'temp-value';
@@ -744,10 +759,11 @@ function updateTemperatureDisplay() {
             systemTempElement.textContent = `${avgTemp}°C`;
             systemTempElement.className = `temp-value ${getTempClass(avgTemp)}`;
         } else if (temp.cpu && temp.cpu > 0) {
-            // CPU + 2-5°C Variation für System-Temperatur
+            // Keine echten Sensordaten verfügbar: CPU plus 2-5°C als grobe Schätzung.
             const systemTemp = temp.cpu + Math.floor(Math.random() * 4 + 2);
-            systemTempElement.textContent = `${systemTemp}°C`;
-            systemTempElement.className = `temp-value ${getTempClass(systemTemp)}`;
+            systemTempElement.textContent = `~${systemTemp}°C`;
+            systemTempElement.title = t('estimatedTemperature');
+            systemTempElement.className = `temp-value estimated ${getTempClass(systemTemp)}`;
         } else {
             systemTempElement.textContent = 'N/A';
             systemTempElement.className = 'temp-value';
@@ -773,11 +789,11 @@ function updateDiskDisplay() {
         diskElement.className = 'disk-item';
         diskElement.innerHTML = `
             <div class="disk-header">
-                <span class="disk-name">${disk.fs}</span>
+                <span class="disk-name">${escapeHtml(disk.fs)}</span>
                 <span class="disk-usage">${usage}%</span>
             </div>
             <div class="disk-details">
-                <div>Mount: ${disk.mount}</div>
+                <div>Mount: ${escapeHtml(disk.mount)}</div>
                 <div>Größe: ${formatBytes(disk.size)}</div>
                 <div>Verwendet: ${formatBytes(disk.used)}</div>
             </div>
@@ -945,8 +961,8 @@ function setupCharts() {
 // Update Charts
 // Optimiertes Chart-Update-System
 let lastChartUpdate = 0;
-const CHART_UPDATE_INTERVAL = 4000; // Charts alle 4 Sekunden - reduzierte CPU-Last
-const MAX_CHART_POINTS = 15; // Weniger Datenpunkte für bessere Performance
+const CHART_UPDATE_INTERVAL = APP_CONFIG.CHART_UPDATE_INTERVAL;
+const MAX_CHART_POINTS = APP_CONFIG.MAX_CHART_POINTS;
 
 function updateCharts() {
     if (!systemInfo) return;
@@ -990,15 +1006,6 @@ function updateCharts() {
     });
 }
 
-// Compatibility aliases
-async function loadProcesses() {
-    await loadProcessesOptimized();
-}
-
-async function loadNetworkInfo() {
-    await loadNetworkInfoOptimized();
-}
-
 // OPTIMIERTE FUNKTIONEN FÜR BESSERE PERFORMANCE
 
 // Optimierte Prozess-Ladung mit Caching und Lazy Loading
@@ -1036,7 +1043,7 @@ function renderProcessList(processes) {
         const processElement = document.createElement('div');
         processElement.className = 'process-item';
         processElement.innerHTML = `
-            <div class="process-name">${process.name}</div>
+            <div class="process-name">${escapeHtml(process.name)}</div>
             <div class="process-details">
                 PID: ${process.pid} | CPU: ${process.cpu.toFixed(1)}% | RAM: ${process.mem.toFixed(1)}%
             </div>
@@ -1084,12 +1091,12 @@ function renderNetworkInfo(networkInfo) {
         const interfaceElement = document.createElement('div');
         interfaceElement.className = 'network-interface';
         interfaceElement.innerHTML = `
-            <h4>${iface.iface}</h4>
+            <h4>${escapeHtml(iface.iface)}</h4>
             <div class="network-details">
-                <div>IP: ${iface.ip4 || 'N/A'}</div>
-                <div>MAC: ${iface.mac || 'N/A'}</div>
-                <div>Typ: ${iface.type}</div>
-                <div>Status: ${iface.operstate}</div>
+                <div>IP: ${escapeHtml(iface.ip4 || 'N/A')}</div>
+                <div>MAC: ${escapeHtml(iface.mac || 'N/A')}</div>
+                <div>Typ: ${escapeHtml(iface.type)}</div>
+                <div>Status: ${escapeHtml(iface.operstate)}</div>
             </div>
         `;
         fragment.appendChild(interfaceElement);
@@ -1113,9 +1120,9 @@ async function forceLoadNetwork() {
 
 // Check Updates
 async function checkUpdates() {
+    const updateButton = document.getElementById('check-updates');
+    const originalText = updateButton.textContent;
     try {
-        const updateButton = document.getElementById('check-updates');
-        const originalText = updateButton.textContent;
         updateButton.textContent = t('checkingUpdates');
         updateButton.disabled = true;
         
@@ -1159,11 +1166,11 @@ async function checkUpdates() {
                     const newVersion = parts[3];
                     
                     packageElement.innerHTML = `
-                        <div class="package-name">${packageName}</div>
+                        <div class="package-name">${escapeHtml(packageName)}</div>
                         <div class="package-versions">
-                            <span class="current-version">${currentVersion}</span>
+                            <span class="current-version">${escapeHtml(currentVersion)}</span>
                             <span class="arrow">→</span>
-                            <span class="new-version">${newVersion}</span>
+                            <span class="new-version">${escapeHtml(newVersion)}</span>
                         </div>
                     `;
                 } else {
@@ -1184,7 +1191,6 @@ async function checkUpdates() {
         document.getElementById('update-count').textContent = t('errorCheckingUpdates');
         document.getElementById('update-count').className = 'update-count error';
     } finally {
-        const updateButton = document.getElementById('check-updates');
         updateButton.textContent = originalText;
         updateButton.disabled = false;
     }
@@ -1192,9 +1198,9 @@ async function checkUpdates() {
 
 // Install Updates mit erweitertem Feedback
 async function installUpdates() {
+    const installButton = document.getElementById('install-updates');
+    const originalText = installButton.textContent;
     try {
-        const installButton = document.getElementById('install-updates');
-        const originalText = installButton.textContent;
         installButton.textContent = 'Installiere Updates...';
         installButton.disabled = true;
         
@@ -1254,7 +1260,7 @@ async function installUpdates() {
             setTimeout(() => {
                 updateCount.innerHTML = `
                     <div class="update-success">
-                        <div class="success-message">✅ ${result.message}</div>
+                        <div class="success-message">✅ ${escapeHtml(result.message)}</div>
                         ${result.requiresReboot ? `
                             <div class="reboot-notice">
                                 <p>Ein System-Neustart wird empfohlen, um alle Updates zu aktivieren.</p>
@@ -1300,10 +1306,11 @@ async function installUpdates() {
             updateCount.innerHTML = `
                 <div class="update-error">
                     <div class="error-message">❌ Fehler bei der Update-Installation</div>
-                    <div class="error-details">${result.error}</div>
-                    <button onclick="checkUpdates()" class="retry-button">Erneut versuchen</button>
+                    <div class="error-details">${escapeHtml(result.error)}</div>
+                    <button class="retry-button">Erneut versuchen</button>
                 </div>
             `;
+            updateCount.querySelector('.retry-button')?.addEventListener('click', checkUpdates);
         }
     } catch (error) {
         console.error('Fehler bei der Update-Installation:', error);
@@ -1312,11 +1319,11 @@ async function installUpdates() {
             <div class="update-error">
                 <div class="error-message">❌ ${t('errorInstallingUpdatesLong')}</div>
                 <div class="error-details">${t('unknownError')}</div>
-                <button onclick="checkUpdates()" class="retry-button">${t('retryButton')}</button>
+                <button class="retry-button">${t('retryButton')}</button>
             </div>
         `;
+        updateCount.querySelector('.retry-button')?.addEventListener('click', checkUpdates);
     } finally {
-        const installButton = document.getElementById('install-updates');
         installButton.textContent = originalText;
         installButton.disabled = false;
     }
@@ -1371,9 +1378,9 @@ function displayPackageSuggestions(packages, totalFound) {
         const suggestionElement = document.createElement('div');
         suggestionElement.className = 'package-suggestion';
         suggestionElement.innerHTML = `
-            <div class="package-name">${pkg.name}</div>
-            <div class="package-version">Version: ${pkg.version}</div>
-            <div class="package-description">${pkg.description}</div>
+            <div class="package-name">${escapeHtml(pkg.name)}</div>
+            <div class="package-version">Version: ${escapeHtml(pkg.version)}</div>
+            <div class="package-description">${escapeHtml(pkg.description)}</div>
             <div class="package-source ${pkg.source}">${pkg.source === 'official' ? 'Offiziell' : 'AUR'}</div>
         `;
 
@@ -1387,7 +1394,7 @@ function displayPackageSuggestions(packages, totalFound) {
     if (totalFound > packages.length) {
         const moreInfo = document.createElement('div');
         moreInfo.className = 'no-packages-found';
-        moreInfo.innerHTML = `<small>Zeige ${packages.length} von ${totalFound} Ergebnissen</small>`;
+        moreInfo.innerHTML = `<small>Zeige ${escapeHtml(packages.length)} von ${escapeHtml(totalFound)} Ergebnissen</small>`;
         suggestionsContainer.appendChild(moreInfo);
     }
 
@@ -1405,7 +1412,7 @@ function showSearchError(error) {
     const suggestionsContainer = document.getElementById('package-suggestions');
     suggestionsContainer.innerHTML = `
         <div class="no-packages-found">
-            ❌ Fehler bei der Suche: ${error}
+            ❌ Fehler bei der Suche: ${escapeHtml(error)}
         </div>
     `;
     suggestionsContainer.style.display = 'block';
@@ -1421,7 +1428,7 @@ async function installSelectedPackage(packageName, source, displayName) {
     // Create progress UI
     installStatus.innerHTML = `
         <div class="package-progress">
-            <div class="package-progress-text">${displayName} wird installiert...</div>
+            <div class="package-progress-text">${escapeHtml(displayName)} wird installiert...</div>
             <div class="package-progress-bar">
                 <div class="package-progress-fill" style="width: 0%"></div>
             </div>
@@ -1455,27 +1462,27 @@ async function installSelectedPackage(packageName, source, displayName) {
         
         setTimeout(() => {
             if (result.success) {
-                installStatus.innerHTML = `✅ ${displayName} erfolgreich installiert!`;
+                installStatus.innerHTML = `✅ ${escapeHtml(displayName)} erfolgreich installiert!`;
                 installStatus.className = 'install-status success';
-                
+
                 // Clear search field
                 document.getElementById('package-search').value = '';
             } else {
-                let errorMessage = `❌ Installation von ${displayName} fehlgeschlagen: ${result.error}`;
+                let errorMessage = `❌ Installation von ${escapeHtml(displayName)} fehlgeschlagen: ${escapeHtml(result.error)}`;
                 if (result.details) {
-                    errorMessage += `<br><br><small>Details: ${result.details}</small>`;
+                    errorMessage += `<br><br><small>Details: ${escapeHtml(result.details)}</small>`;
                 }
                 installStatus.innerHTML = errorMessage;
                 installStatus.className = 'install-status error';
             }
         }, 2000); // Wait 2 seconds to show completion
-        
+
     } catch (error) {
         // Clean up progress listener
         window.electronAPI.removePackageInstallProgressListener();
-        
+
         console.error('Fehler bei der Paketinstallation:', error);
-        installStatus.innerHTML = `❌ Installation von ${displayName} fehlgeschlagen`;
+        installStatus.innerHTML = `❌ Installation von ${escapeHtml(displayName)} fehlgeschlagen`;
         installStatus.className = 'install-status error';
     }
 }
@@ -1492,9 +1499,9 @@ async function loadServices() {
             const serviceElement = document.createElement('div');
             serviceElement.className = 'service-item';
             serviceElement.innerHTML = `
-                <div class="service-name">${service.name}</div>
+                <div class="service-name">${escapeHtml(service.name)}</div>
                 <div class="service-status ${service.status === 'active' ? 'active' : 'inactive'}">
-                    ${service.status}
+                    ${escapeHtml(service.status)}
                 </div>
             `;
             servicesList.appendChild(serviceElement);
@@ -1674,13 +1681,20 @@ function showActionNotification(message, filepath, type = 'success', duration = 
         min-width: 300px;
     `;
     
-    notification.innerHTML = `
-        <span class="notification-message">${message}</span>
-        <button class="notification-action-btn" onclick="openExportedFile('${filepath}', '${notificationId}')">
-            📂 Datei öffnen
-        </button>
-    `;
-    
+    const messageSpan = document.createElement('span');
+    messageSpan.className = 'notification-message';
+    messageSpan.textContent = message;
+
+    const openButton = document.createElement('button');
+    openButton.className = 'notification-action-btn';
+    openButton.textContent = '📂 Datei öffnen';
+    // Direkter Listener statt inline onclick mit String-Interpolation, damit filepath/
+    // notificationId nicht als HTML/JS-Text eingebettet werden müssen (XSS-Vermeidung).
+    openButton.addEventListener('click', () => openExportedFile(filepath, notificationId));
+
+    notification.appendChild(messageSpan);
+    notification.appendChild(openButton);
+
     // Add to container
     notificationContainer.appendChild(notification);
     
@@ -1707,7 +1721,7 @@ function showActionNotification(message, filepath, type = 'success', duration = 
 }
 
 // Global function to open exported file
-window.openExportedFile = async function(filepath, notificationId) {
+async function openExportedFile(filepath, notificationId) {
     try {
         const result = await window.electronAPI.openFile(filepath);
         if (result.success) {
@@ -1763,7 +1777,6 @@ function newTerminal() {
 // Setup Terminal
 function setupTerminal() {
     const terminalInput = document.getElementById('terminal-input');
-    const terminalOutput = document.getElementById('terminal-output');
 
     if (!terminalInput) return;
 
@@ -1789,7 +1802,7 @@ async function handleTerminalKeydown(e) {
             commandLine.className = 'terminal-line';
             commandLine.innerHTML = `
                 <span class="prompt">user@archlinux:~$</span>
-                <span class="command">${command}</span>
+                <span class="command">${escapeHtml(command)}</span>
             `;
             terminalOutput.appendChild(commandLine);
 
@@ -1814,9 +1827,9 @@ async function handleTerminalKeydown(e) {
                 outputLine.className = 'terminal-line';
                 
                 if (result.success) {
-                    outputLine.innerHTML = `<span class="output">${result.output.replace(/\n/g, '<br>')}</span>`;
+                    outputLine.innerHTML = `<span class="output">${escapeHtml(result.output).replace(/\n/g, '<br>')}</span>`;
                 } else {
-                    outputLine.innerHTML = `<span class="output error">${result.output || result.error}</span>`;
+                    outputLine.innerHTML = `<span class="output error">${escapeHtml(result.output || result.error).replace(/\n/g, '<br>')}</span>`;
                 }
                 
                 terminalOutput.appendChild(outputLine);
@@ -1837,7 +1850,7 @@ async function handleTerminalKeydown(e) {
                 
                 const errorLine = document.createElement('div');
                 errorLine.className = 'terminal-line';
-                errorLine.innerHTML = `<span class="output error">Fehler: ${error.message}</span>`;
+                errorLine.innerHTML = `<span class="output error">Fehler: ${escapeHtml(error.message)}</span>`;
                 terminalOutput.appendChild(errorLine);
             }
             
@@ -1870,7 +1883,7 @@ function startSystemMonitoring() {
 
 // Performance optimization: Add throttling for expensive operations
 let lastSystemInfoUpdate = 0;
-const SYSTEM_INFO_CACHE_DURATION = 2000; // 2 Sekunden Cache - weniger API-Calls
+const SYSTEM_INFO_CACHE_DURATION = APP_CONFIG.SYSTEM_INFO_CACHE_DURATION;
 
 async function loadSystemInfoThrottled() {
     const now = Date.now();
@@ -1903,7 +1916,7 @@ async function showExportDialog() {
         <div class="export-dialog">
             <div class="export-dialog-header">
                 <h3>📊 System Report exportieren</h3>
-                <button class="export-dialog-close" onclick="closeExportDialog()">&times;</button>
+                <button class="export-dialog-close">&times;</button>
             </div>
             <div class="export-dialog-content">
                 <p>Wählen Sie das Format für den Export:</p>
@@ -1926,7 +1939,9 @@ async function showExportDialog() {
     `;
     
     document.body.appendChild(dialog);
-    
+
+    dialog.querySelector('.export-dialog-close')?.addEventListener('click', closeExportDialog);
+
     // Event-Listener für Format-Buttons
     dialog.querySelectorAll('.export-format-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -1985,7 +2000,7 @@ async function collectSystemData() {
                 kernel: systemInfo.os?.kernel || 'N/A',
                 arch: systemInfo.os?.arch || 'N/A',
                 hostname: systemInfo.os?.hostname || 'N/A',
-                uptime: formatUptime(systemInfo.os?.uptime || 0)
+                uptime: formatUptimeCompact(systemInfo.os?.uptime || 0)
             },
             cpu: {
                 model: systemInfo.cpu?.manufacturer + ' ' + systemInfo.cpu?.brand || 'N/A',
@@ -2029,11 +2044,14 @@ async function collectSystemData() {
     }
 }
 
-function formatUptime(seconds) {
+// Kompaktes Uptime-Format nur für den Export-Report (vorher versehentlich als zweite
+// "formatUptime"-Deklaration definiert, die die verbose Variante oben stillschweigend
+// überschrieben hat und dadurch die Haupt-Uptime-Anzeige verfälschte).
+function formatUptimeCompact(seconds) {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (days > 0) {
         return `${days}d ${hours}h ${minutes}m`;
     } else if (hours > 0) {
@@ -2085,10 +2103,10 @@ async function performSecurityScan() {
                 const eventElement = document.createElement('div');
                 eventElement.className = `security-event ${event.type}`;
                 eventElement.innerHTML = `
-                    <div class="security-event-icon">${getEventIcon(event.type)}</div>
+                    <div class="security-event-icon">${escapeHtml(getEventIcon(event.type))}</div>
                     <div class="security-event-content">
-                        <div class="security-event-time">${event.time}</div>
-                        <div class="security-event-message">${event.message}</div>
+                        <div class="security-event-time">${escapeHtml(event.time)}</div>
+                        <div class="security-event-message">${escapeHtml(event.message)}</div>
                     </div>
                 `;
                 eventsContainer.appendChild(eventElement);
@@ -2205,7 +2223,7 @@ window.addEventListener('beforeunload', () => {
     }
     
     // Clear all timeouts
-    if (typeof searchTimeout !== 'undefined' && searchTimeout) {
+    if (searchTimeout) {
         clearTimeout(searchTimeout);
         searchTimeout = null;
     }

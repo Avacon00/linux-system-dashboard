@@ -1,5 +1,5 @@
 const { autoUpdater } = require('electron-updater');
-const { dialog, BrowserWindow, ipcMain } = require('electron');
+const { dialog, ipcMain } = require('electron');
 const log = require('electron-log');
 
 // Auto-Updater Konfiguration

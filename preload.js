@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdates: () => ipcRenderer.invoke('install-updates'),
   rebootSystem: () => ipcRenderer.invoke('reboot-system'),
   searchPackages: (searchTerm) => ipcRenderer.invoke('search-packages', searchTerm),
-  installPackage: (packageName, source) => ipcRenderer.invoke('install-package', packageName, source),
   installPackageWithProgress: (packageName, source) => ipcRenderer.invoke('install-package-with-progress', packageName, source),
   
   // Event listeners for progress updates

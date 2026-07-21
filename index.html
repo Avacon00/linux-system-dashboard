@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';">
     <title>Linux System Dashboard</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="node_modules/chart.js/dist/chart.umd.min.js"></script>
     <script src="translations.js"></script>
+    <script src="escape-html.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
     <!-- Title Bar -->
@@ -27,29 +30,29 @@
     <div class="main-container">
         <!-- Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-navigation">
-                <div class="sidebar-item active" data-tab="system" data-tooltip="systemInfoTooltip">
-                    <i class="icon">📊</i>
+            <div class="sidebar-navigation" role="tablist" aria-label="Hauptnavigation">
+                <div class="sidebar-item active" data-tab="system" data-tooltip="systemInfoTooltip" role="tab" tabindex="0" aria-selected="true">
+                    <i class="icon" aria-hidden="true">📊</i>
                     <span data-translate="systemInfo">System-Info</span>
                 </div>
-                <div class="sidebar-item" data-tab="actions" data-tooltip="quickActionsTooltip">
-                    <i class="icon">⚡</i>
+                <div class="sidebar-item" data-tab="actions" data-tooltip="quickActionsTooltip" role="tab" tabindex="0" aria-selected="false">
+                    <i class="icon" aria-hidden="true">⚡</i>
                     <span data-translate="quickActions">Schnellaktionen</span>
                 </div>
-                <div class="sidebar-item" data-tab="learn" data-tooltip="learningAreaTooltip">
-                    <i class="icon">📚</i>
+                <div class="sidebar-item" data-tab="learn" data-tooltip="learningAreaTooltip" role="tab" tabindex="0" aria-selected="false">
+                    <i class="icon" aria-hidden="true">📚</i>
                     <span data-translate="learningArea">Lernbereich</span>
                 </div>
-                <div class="sidebar-item" data-tab="terminal" data-tooltip="terminalTooltip">
-                    <i class="icon">💻</i>
+                <div class="sidebar-item" data-tab="terminal" data-tooltip="terminalTooltip" role="tab" tabindex="0" aria-selected="false">
+                    <i class="icon" aria-hidden="true">💻</i>
                     <span data-translate="terminal">Terminal</span>
                 </div>
             </div>
-            
+
             <!-- Language Switcher -->
             <div class="sidebar-bottom">
-                <div class="language-switcher" id="language-switcher" title="Sprache wechseln / Switch Language">
-                    <img src="assets/language-switcher.svg" alt="Language Switcher" class="language-icon">
+                <div class="language-switcher" id="language-switcher" title="Sprache wechseln / Switch Language" role="button" tabindex="0" aria-label="Sprache wechseln / Switch Language">
+                    <img src="assets/language-switcher.svg" alt="" class="language-icon">
                     <span class="language-label" id="current-language">DE</span>
                 </div>
             </div>
@@ -515,10 +518,10 @@
                     <div class="card">
                         <h3 data-translate="beginnerTips">💡 Tipps für Einsteiger</h3>
                         <div class="tips-list">
-                            <div class="tip" data-translate="openTerminal">
+                            <div class="tip" data-translate="terminalShortcutTip">
                                 <strong>Terminal öffnen:</strong> Strg+Alt+T
                             </div>
-                            <div class="tip" data-translate="openFileManager">
+                            <div class="tip" data-translate="fileManagerShortcutTip">
                                 <strong>Dateimanager:</strong> Super+E
                             </div>
                             <div class="tip" data-translate="openApplications">
