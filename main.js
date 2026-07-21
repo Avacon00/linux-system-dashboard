@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require(
 const path = require('path');
 const os = require('os');
 const si = require('systeminformation');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const fs = require('fs');
 const sudo = require('sudo-prompt');
 // Auto-Updater - robust laden
@@ -1497,7 +1497,7 @@ const ALLOWED_COMMANDS = {
   'curl': { safe: false, description: 'HTTP-Anfragen - nicht erlaubt' },
   
   // System-Administration (eingeschränkt)
-  'systemctl': { safe: true, description: 'Systemd-Services verwalten', sudoOnly: true },
+  'systemctl': { safe: true, description: 'Systemd-Services verwalten (nur Status-Abfragen)', sudoOnly: true, allowedSubcommands: ['status', 'list-units', 'list-unit-files', 'is-active', 'is-enabled', 'is-failed'] },
   'journalctl': { safe: true, description: 'System-Logs anzeigen' },
   'dmesg': { safe: true, description: 'Kernel-Nachrichten anzeigen' },
   
@@ -1521,6 +1521,47 @@ const ALLOWED_COMMANDS = {
   'mkfs': { safe: false, description: 'Dateisystem erstellen - nicht erlaubt', danger: 'DATENLÖSCHUNG' },
   'dd': { safe: false, description: 'Daten kopieren - nicht erlaubt', danger: 'DATENLÖSCHUNG' }
 };
+
+// Shell-Metazeichen, die bei execFile() zwar ohnehin nicht interpretiert werden (kein
+// /bin/sh), aber sicherheitshalber explizit zurückgewiesen werden, damit sich niemand auf
+// eine implizite Shell-Auswertung verlassen kann.
+const SHELL_METACHARACTERS = /[;&|`$<>(){}\n]/;
+
+// Prüft die geparsten Argumente eines Terminal-Befehls gegen die in ALLOWED_COMMANDS
+// hinterlegten Einschränkungen (maxArgs / allowedFlags / sudoRequired / allowedSubcommands).
+function validateTerminalArgs(baseCommand, args, commandInfo) {
+  if (SHELL_METACHARACTERS.test(baseCommand) || args.some(arg => SHELL_METACHARACTERS.test(arg))) {
+    return { ok: false, reason: 'Ungültige Zeichen im Befehl (Shell-Metazeichen sind nicht erlaubt).' };
+  }
+
+  if (typeof commandInfo.maxArgs === 'number' && args.length > commandInfo.maxArgs) {
+    return { ok: false, reason: `Befehl '${baseCommand}' erlaubt maximal ${commandInfo.maxArgs} Argument(e).` };
+  }
+
+  if (commandInfo.allowedSubcommands) {
+    const subcommand = args[0];
+    if (!subcommand || !commandInfo.allowedSubcommands.includes(subcommand)) {
+      return { ok: false, reason: `Befehl '${baseCommand}' ist nur mit folgenden Subcommands erlaubt: ${commandInfo.allowedSubcommands.join(', ')}.` };
+    }
+  }
+
+  if (commandInfo.allowedFlags) {
+    const flags = args.filter(arg => arg.startsWith('-'));
+    const disallowedFlag = flags.find(flag => !commandInfo.allowedFlags.includes(flag));
+    if (disallowedFlag) {
+      return { ok: false, reason: `Flag '${disallowedFlag}' ist für '${baseCommand}' nicht erlaubt. Erlaubt: ${commandInfo.allowedFlags.join(', ')}.` };
+    }
+  }
+
+  if (commandInfo.sudoRequired) {
+    const requiresSudo = args.some(arg => commandInfo.sudoRequired.includes(arg));
+    if (requiresSudo) {
+      return { ok: false, reason: `Diese Aktion erfordert Root-Rechte und ist im Sandbox-Terminal nicht erlaubt.` };
+    }
+  }
+
+  return { ok: true };
+}
 
 // Export System Report Handler
 ipcMain.handle('export-system-report', async (_, format, data) => {
@@ -1821,18 +1862,28 @@ ipcMain.handle('execute-terminal-command', async (event, commandString) => {
         output: `⚠️  SICHERHEIT: Befehl '${baseCommand}' ist aus Sicherheitsgründen gesperrt.\nGrund: ${commandInfo.danger || 'Potentiell gefährlich'}\n\nVerwenden Sie ein echtes Terminal für administrative Aufgaben.`
       };
     }
-    
+
+    // Argument-Validierung (Shell-Metazeichen, maxArgs, allowedFlags, allowedSubcommands, sudoRequired)
+    const validation = validateTerminalArgs(baseCommand, args, commandInfo);
+    if (!validation.ok) {
+      return {
+        success: false,
+        output: `⚠️  SICHERHEIT: ${validation.reason}`
+      };
+    }
+
     // Timeout für Befehl
     const timeout = commandInfo.timeout || 5000; // 5 Sekunden Standard
-    
-    // Befehl ausführen
+
+    // Befehl ausführen - execFile statt exec: kein "/bin/sh -c", daher werden
+    // Shell-Metazeichen (; & | ` $() < >) in Argumenten niemals interpretiert.
     return new Promise((resolve) => {
-      const child = exec(commandString, {
+      const child = execFile(baseCommand, args, {
         timeout: timeout,
         maxBuffer: 1024 * 1024, // 1MB Buffer
         cwd: process.env.HOME || '/home/user'
       }, (error, stdout, stderr) => {
-        
+
         if (error) {
           // Timeout
           if (error.code === 'TIMEOUT') {

@@ -7,6 +7,17 @@ let updateSpeed = 3000; // 3 Sekunden Standard - optimiert für bessere Performa
 let terminalHistoryCount = 0; // Track terminal lines for memory management
 const MAX_TERMINAL_LINES = 100; // Maximum terminal lines to prevent memory leaks
 
+// Escaped HTML-Sonderzeichen, bevor dynamische/externe Daten (z.B. AUR-Paketmetadaten,
+// Terminal-Ein-/Ausgabe, System-Logs) in innerHTML-Templates eingesetzt werden.
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // PERFORMANCE FIX: Static System Info Cache (never changes during runtime)
 let staticSystemInfo = null;
 
@@ -351,7 +362,7 @@ function showSecuritySummary(results) {
         contentHTML += `
             <div class="summary-item">
                 <div class="summary-icon ${iconClass}">${icon}</div>
-                <div class="summary-text">${result.name}: ${result.message}</div>
+                <div class="summary-text">${escapeHtml(result.name)}: ${escapeHtml(result.message)}</div>
             </div>
         `;
     });
@@ -773,11 +784,11 @@ function updateDiskDisplay() {
         diskElement.className = 'disk-item';
         diskElement.innerHTML = `
             <div class="disk-header">
-                <span class="disk-name">${disk.fs}</span>
+                <span class="disk-name">${escapeHtml(disk.fs)}</span>
                 <span class="disk-usage">${usage}%</span>
             </div>
             <div class="disk-details">
-                <div>Mount: ${disk.mount}</div>
+                <div>Mount: ${escapeHtml(disk.mount)}</div>
                 <div>Größe: ${formatBytes(disk.size)}</div>
                 <div>Verwendet: ${formatBytes(disk.used)}</div>
             </div>
@@ -1036,7 +1047,7 @@ function renderProcessList(processes) {
         const processElement = document.createElement('div');
         processElement.className = 'process-item';
         processElement.innerHTML = `
-            <div class="process-name">${process.name}</div>
+            <div class="process-name">${escapeHtml(process.name)}</div>
             <div class="process-details">
                 PID: ${process.pid} | CPU: ${process.cpu.toFixed(1)}% | RAM: ${process.mem.toFixed(1)}%
             </div>
@@ -1084,12 +1095,12 @@ function renderNetworkInfo(networkInfo) {
         const interfaceElement = document.createElement('div');
         interfaceElement.className = 'network-interface';
         interfaceElement.innerHTML = `
-            <h4>${iface.iface}</h4>
+            <h4>${escapeHtml(iface.iface)}</h4>
             <div class="network-details">
-                <div>IP: ${iface.ip4 || 'N/A'}</div>
-                <div>MAC: ${iface.mac || 'N/A'}</div>
-                <div>Typ: ${iface.type}</div>
-                <div>Status: ${iface.operstate}</div>
+                <div>IP: ${escapeHtml(iface.ip4 || 'N/A')}</div>
+                <div>MAC: ${escapeHtml(iface.mac || 'N/A')}</div>
+                <div>Typ: ${escapeHtml(iface.type)}</div>
+                <div>Status: ${escapeHtml(iface.operstate)}</div>
             </div>
         `;
         fragment.appendChild(interfaceElement);
@@ -1159,11 +1170,11 @@ async function checkUpdates() {
                     const newVersion = parts[3];
                     
                     packageElement.innerHTML = `
-                        <div class="package-name">${packageName}</div>
+                        <div class="package-name">${escapeHtml(packageName)}</div>
                         <div class="package-versions">
-                            <span class="current-version">${currentVersion}</span>
+                            <span class="current-version">${escapeHtml(currentVersion)}</span>
                             <span class="arrow">→</span>
-                            <span class="new-version">${newVersion}</span>
+                            <span class="new-version">${escapeHtml(newVersion)}</span>
                         </div>
                     `;
                 } else {
@@ -1254,7 +1265,7 @@ async function installUpdates() {
             setTimeout(() => {
                 updateCount.innerHTML = `
                     <div class="update-success">
-                        <div class="success-message">✅ ${result.message}</div>
+                        <div class="success-message">✅ ${escapeHtml(result.message)}</div>
                         ${result.requiresReboot ? `
                             <div class="reboot-notice">
                                 <p>Ein System-Neustart wird empfohlen, um alle Updates zu aktivieren.</p>
@@ -1300,10 +1311,11 @@ async function installUpdates() {
             updateCount.innerHTML = `
                 <div class="update-error">
                     <div class="error-message">❌ Fehler bei der Update-Installation</div>
-                    <div class="error-details">${result.error}</div>
-                    <button onclick="checkUpdates()" class="retry-button">Erneut versuchen</button>
+                    <div class="error-details">${escapeHtml(result.error)}</div>
+                    <button class="retry-button">Erneut versuchen</button>
                 </div>
             `;
+            updateCount.querySelector('.retry-button')?.addEventListener('click', checkUpdates);
         }
     } catch (error) {
         console.error('Fehler bei der Update-Installation:', error);
@@ -1312,9 +1324,10 @@ async function installUpdates() {
             <div class="update-error">
                 <div class="error-message">❌ ${t('errorInstallingUpdatesLong')}</div>
                 <div class="error-details">${t('unknownError')}</div>
-                <button onclick="checkUpdates()" class="retry-button">${t('retryButton')}</button>
+                <button class="retry-button">${t('retryButton')}</button>
             </div>
         `;
+        updateCount.querySelector('.retry-button')?.addEventListener('click', checkUpdates);
     } finally {
         const installButton = document.getElementById('install-updates');
         installButton.textContent = originalText;
@@ -1371,9 +1384,9 @@ function displayPackageSuggestions(packages, totalFound) {
         const suggestionElement = document.createElement('div');
         suggestionElement.className = 'package-suggestion';
         suggestionElement.innerHTML = `
-            <div class="package-name">${pkg.name}</div>
-            <div class="package-version">Version: ${pkg.version}</div>
-            <div class="package-description">${pkg.description}</div>
+            <div class="package-name">${escapeHtml(pkg.name)}</div>
+            <div class="package-version">Version: ${escapeHtml(pkg.version)}</div>
+            <div class="package-description">${escapeHtml(pkg.description)}</div>
             <div class="package-source ${pkg.source}">${pkg.source === 'official' ? 'Offiziell' : 'AUR'}</div>
         `;
 
@@ -1387,7 +1400,7 @@ function displayPackageSuggestions(packages, totalFound) {
     if (totalFound > packages.length) {
         const moreInfo = document.createElement('div');
         moreInfo.className = 'no-packages-found';
-        moreInfo.innerHTML = `<small>Zeige ${packages.length} von ${totalFound} Ergebnissen</small>`;
+        moreInfo.innerHTML = `<small>Zeige ${escapeHtml(packages.length)} von ${escapeHtml(totalFound)} Ergebnissen</small>`;
         suggestionsContainer.appendChild(moreInfo);
     }
 
@@ -1405,7 +1418,7 @@ function showSearchError(error) {
     const suggestionsContainer = document.getElementById('package-suggestions');
     suggestionsContainer.innerHTML = `
         <div class="no-packages-found">
-            ❌ Fehler bei der Suche: ${error}
+            ❌ Fehler bei der Suche: ${escapeHtml(error)}
         </div>
     `;
     suggestionsContainer.style.display = 'block';
@@ -1421,7 +1434,7 @@ async function installSelectedPackage(packageName, source, displayName) {
     // Create progress UI
     installStatus.innerHTML = `
         <div class="package-progress">
-            <div class="package-progress-text">${displayName} wird installiert...</div>
+            <div class="package-progress-text">${escapeHtml(displayName)} wird installiert...</div>
             <div class="package-progress-bar">
                 <div class="package-progress-fill" style="width: 0%"></div>
             </div>
@@ -1455,27 +1468,27 @@ async function installSelectedPackage(packageName, source, displayName) {
         
         setTimeout(() => {
             if (result.success) {
-                installStatus.innerHTML = `✅ ${displayName} erfolgreich installiert!`;
+                installStatus.innerHTML = `✅ ${escapeHtml(displayName)} erfolgreich installiert!`;
                 installStatus.className = 'install-status success';
-                
+
                 // Clear search field
                 document.getElementById('package-search').value = '';
             } else {
-                let errorMessage = `❌ Installation von ${displayName} fehlgeschlagen: ${result.error}`;
+                let errorMessage = `❌ Installation von ${escapeHtml(displayName)} fehlgeschlagen: ${escapeHtml(result.error)}`;
                 if (result.details) {
-                    errorMessage += `<br><br><small>Details: ${result.details}</small>`;
+                    errorMessage += `<br><br><small>Details: ${escapeHtml(result.details)}</small>`;
                 }
                 installStatus.innerHTML = errorMessage;
                 installStatus.className = 'install-status error';
             }
         }, 2000); // Wait 2 seconds to show completion
-        
+
     } catch (error) {
         // Clean up progress listener
         window.electronAPI.removePackageInstallProgressListener();
-        
+
         console.error('Fehler bei der Paketinstallation:', error);
-        installStatus.innerHTML = `❌ Installation von ${displayName} fehlgeschlagen`;
+        installStatus.innerHTML = `❌ Installation von ${escapeHtml(displayName)} fehlgeschlagen`;
         installStatus.className = 'install-status error';
     }
 }
@@ -1492,9 +1505,9 @@ async function loadServices() {
             const serviceElement = document.createElement('div');
             serviceElement.className = 'service-item';
             serviceElement.innerHTML = `
-                <div class="service-name">${service.name}</div>
+                <div class="service-name">${escapeHtml(service.name)}</div>
                 <div class="service-status ${service.status === 'active' ? 'active' : 'inactive'}">
-                    ${service.status}
+                    ${escapeHtml(service.status)}
                 </div>
             `;
             servicesList.appendChild(serviceElement);
@@ -1674,13 +1687,20 @@ function showActionNotification(message, filepath, type = 'success', duration = 
         min-width: 300px;
     `;
     
-    notification.innerHTML = `
-        <span class="notification-message">${message}</span>
-        <button class="notification-action-btn" onclick="openExportedFile('${filepath}', '${notificationId}')">
-            📂 Datei öffnen
-        </button>
-    `;
-    
+    const messageSpan = document.createElement('span');
+    messageSpan.className = 'notification-message';
+    messageSpan.textContent = message;
+
+    const openButton = document.createElement('button');
+    openButton.className = 'notification-action-btn';
+    openButton.textContent = '📂 Datei öffnen';
+    // Direkter Listener statt inline onclick mit String-Interpolation, damit filepath/
+    // notificationId nicht als HTML/JS-Text eingebettet werden müssen (XSS-Vermeidung).
+    openButton.addEventListener('click', () => openExportedFile(filepath, notificationId));
+
+    notification.appendChild(messageSpan);
+    notification.appendChild(openButton);
+
     // Add to container
     notificationContainer.appendChild(notification);
     
@@ -1789,7 +1809,7 @@ async function handleTerminalKeydown(e) {
             commandLine.className = 'terminal-line';
             commandLine.innerHTML = `
                 <span class="prompt">user@archlinux:~$</span>
-                <span class="command">${command}</span>
+                <span class="command">${escapeHtml(command)}</span>
             `;
             terminalOutput.appendChild(commandLine);
 
@@ -1814,9 +1834,9 @@ async function handleTerminalKeydown(e) {
                 outputLine.className = 'terminal-line';
                 
                 if (result.success) {
-                    outputLine.innerHTML = `<span class="output">${result.output.replace(/\n/g, '<br>')}</span>`;
+                    outputLine.innerHTML = `<span class="output">${escapeHtml(result.output).replace(/\n/g, '<br>')}</span>`;
                 } else {
-                    outputLine.innerHTML = `<span class="output error">${result.output || result.error}</span>`;
+                    outputLine.innerHTML = `<span class="output error">${escapeHtml(result.output || result.error).replace(/\n/g, '<br>')}</span>`;
                 }
                 
                 terminalOutput.appendChild(outputLine);
@@ -1837,7 +1857,7 @@ async function handleTerminalKeydown(e) {
                 
                 const errorLine = document.createElement('div');
                 errorLine.className = 'terminal-line';
-                errorLine.innerHTML = `<span class="output error">Fehler: ${error.message}</span>`;
+                errorLine.innerHTML = `<span class="output error">Fehler: ${escapeHtml(error.message)}</span>`;
                 terminalOutput.appendChild(errorLine);
             }
             
@@ -1903,7 +1923,7 @@ async function showExportDialog() {
         <div class="export-dialog">
             <div class="export-dialog-header">
                 <h3>📊 System Report exportieren</h3>
-                <button class="export-dialog-close" onclick="closeExportDialog()">&times;</button>
+                <button class="export-dialog-close">&times;</button>
             </div>
             <div class="export-dialog-content">
                 <p>Wählen Sie das Format für den Export:</p>
@@ -1926,7 +1946,9 @@ async function showExportDialog() {
     `;
     
     document.body.appendChild(dialog);
-    
+
+    dialog.querySelector('.export-dialog-close')?.addEventListener('click', closeExportDialog);
+
     // Event-Listener für Format-Buttons
     dialog.querySelectorAll('.export-format-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -2085,10 +2107,10 @@ async function performSecurityScan() {
                 const eventElement = document.createElement('div');
                 eventElement.className = `security-event ${event.type}`;
                 eventElement.innerHTML = `
-                    <div class="security-event-icon">${getEventIcon(event.type)}</div>
+                    <div class="security-event-icon">${escapeHtml(getEventIcon(event.type))}</div>
                     <div class="security-event-content">
-                        <div class="security-event-time">${event.time}</div>
-                        <div class="security-event-message">${event.message}</div>
+                        <div class="security-event-time">${escapeHtml(event.time)}</div>
+                        <div class="security-event-message">${escapeHtml(event.message)}</div>
                     </div>
                 `;
                 eventsContainer.appendChild(eventElement);
