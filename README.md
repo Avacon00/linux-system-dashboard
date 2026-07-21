@@ -7,6 +7,7 @@
 **Das modernste und einfachste System-Dashboard für Linux**
 
 [![Release](https://img.shields.io/github/v/release/Avacon00/linux-system-dashboard)](https://github.com/Avacon00/linux-system-dashboard/releases/latest)
+[![Build](https://github.com/Avacon00/linux-system-dashboard/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Avacon00/linux-system-dashboard/actions/workflows/build-and-release.yml)
 [![Downloads](https://img.shields.io/github/downloads/Avacon00/linux-system-dashboard/total)](https://github.com/Avacon00/linux-system-dashboard/releases)
 [![License](https://img.shields.io/github/license/Avacon00/linux-system-dashboard)](LICENSE)
 
@@ -29,17 +30,17 @@
 
 #### 📦 **AppImage Download:**
 
-**[>> Download Linux-System-Dashboard-1.0.9.AppImage <<](https://github.com/Avacon00/linux-system-dashboard/releases/latest)**
+**[>> Download Linux-System-Dashboard-1.1.0.AppImage <<](https://github.com/Avacon00/linux-system-dashboard/releases/latest)**
 
 ```bash
 # 1. Download (oder Browser-Download)
-wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.0.9.AppImage
+wget https://github.com/Avacon00/linux-system-dashboard/releases/latest/download/Linux-System-Dashboard-1.1.0.AppImage
 
 # 2. Ausführbar machen
-chmod +x Linux-System-Dashboard-1.0.9.AppImage
+chmod +x Linux-System-Dashboard-1.1.0.AppImage
 
 # 3. Starten
-./Linux-System-Dashboard-1.0.9.AppImage
+./Linux-System-Dashboard-1.1.0.AppImage
 ```
 
 **Das war's!** 🎉 Keine Installation, keine Konfiguration, keine Probleme!
@@ -150,10 +151,14 @@ npm run build-deb
 ### Build-Befehle
 ```bash
 npm run dev           # Development mit Hot-Reload
+npm test              # Testsuite ausführen
+npm run lint           # Code-Qualität prüfen (ESLint)
 npm run build-appimage # AppImage erstellen
 npm run build-deb      # .deb-Paket erstellen
 npm run dist-linux     # Alle Linux-Formate
 ```
+
+Siehe [CONTRIBUTING.md](CONTRIBUTING.md) für Details zum Entwicklungs-Workflow.
 
 ### Performance-Features
 - ✅ **Smart Lazy Loading** - Tab-basierte Aktualisierung
