@@ -5,6 +5,8 @@ Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-21
+
 ### Fixed (CI)
 - Root Cause der seit dem allerersten Commit durchgehend roten CI-Pipeline gefunden und
   behoben: `electron-builder` brach den `.deb`-Build ohne `author.email`/`linux.maintainer`
